@@ -1,0 +1,424 @@
+function initializeSelect2ImageOption(AiStudioV2Validation = false) {
+    let lastModelSelected;
+    const isImageSource = (value) => {
+        if (!value || typeof value !== 'string') {
+            return false;
+        }
+
+        const normalizedValue = value.trim();
+        if (normalizedValue === '') {
+            return false;
+        }
+
+        return normalizedValue.startsWith('http://')
+            || normalizedValue.startsWith('https://')
+            || normalizedValue.startsWith('/')
+            || normalizedValue.startsWith('data:image/')
+            || normalizedValue.includes('</svg>');
+    };
+
+    function formatOption(option) {
+        if(option?.loading) return;
+
+        if (!option.id) {
+            return option.text;
+        }
+
+        const paramsObj = JSON.parse(option.element?.dataset?.params) || {};
+        const rawImageUrl = paramsObj.img_url || paramsObj.icon;
+        let imageUrl = rawImageUrl;
+        let isSvgElement = imageUrl && imageUrl.includes('</svg>');
+
+        if(AiStudioV2Validation) {
+            const modelTypeSelector = document.getElementById("model-type");
+            if(modelTypeSelector.selectedIndex != -1) lastModelSelected = modelTypeSelector.selectedIndex;
+            const selectedOption = modelTypeSelector.options[lastModelSelected].value;
+            let modelType = paramsObj?.model_type;
+            if(modelType !== undefined && modelType !== selectedOption) return;
+        }
+
+        const fieldName = $(option.element).parent().prop('name')
+        if (fieldName.includes('model') && imageUrl && $('body').hasClass('theme-dark') && !isSvgElement) {
+            const [name, extension] = imageUrl.split(/\.(?=[^.]+$)/);
+            imageUrl =  `${name}-dark.${extension}`;
+        }
+
+        let tooltip = (paramsObj.tooltip || '');
+
+        if (rawImageUrl !== imageUrl) {
+            tooltip = tooltip.replace(rawImageUrl, imageUrl);
+        }
+
+        let imgContent = '';
+        if (isSvgElement) {
+            imgContent = imageUrl;
+        } else if (isImageSource(imageUrl)) {
+            imgContent = '<img style="height: 16px; width: 16px;" src="' + imageUrl + '" class="img-option-select2 ml-1" />';
+        }
+        const optionLabel = '<div class="mx-1">' + option.element.label + '</div>';
+        const tags = (paramsObj.tags && Array.isArray(paramsObj.tags)) 
+            ? '<div class="flex ml-auto">' + paramsObj.tags.map(tag => {
+                const tagText = tag.color ? `${tag.color}-tag` : '';
+                const backgroundColor = tag.backgroundColor ? `background-color:${tag.backgroundColor};` : '';
+                const textColor = tag.textColor ? `color:${tag.textColor};` : '';
+                
+                return `<span 
+                    class="small-text tag ml-1 rounded-lg ${tagText}" 
+                    style="${backgroundColor}${textColor}"
+                    data-tooltip="${tag.tooltip || ''}" 
+                    data-dark-background="${tag.darkBackgroundColor || ''}" 
+                    data-dark-text="${tag.darkTextColor || ''}"><b>${tag.text}</b></span>`;
+            }).join('') + '</div>'
+            : '';
+
+        const $option = $(
+            '<span style="min-width: 4em;flex-grow: 1;" class="option-select2"><div class="w-100 flex items-center">' + imgContent + optionLabel + tags + '</div></span>'
+        );
+        
+        // `model_info_id` points into window.tessModelInfos and is rendered via
+        // the shared ModelInfoCard renderer. `tooltip` is a fallback for options
+        // served from a stale ModelConfigService cache entry (1h TTL).
+        if (paramsObj.model_info_id) {
+            $option.attr('data-model-info-id', paramsObj.model_info_id);
+        } else if (tooltip) {
+            $option.attr('title', tooltip);
+        }
+
+        setTimeout(() => updateTagsForDarkMode(), 0);
+
+        return $option;
+    }
+
+    $('<style>')
+        .prop('type', 'text/css')
+        .html(`
+            .select2-container--default .select2-results__option span {
+                margin-left: 0px !important;
+            }
+            .select2-container--bootstrap-5 .select2-selection {
+                line-height: 0px;
+            }
+            .select2-container .select2-selection--single .select2-selection__rendered {
+                padding-left: 0px !important;
+                padding-right: 22px !important;
+            }
+            .select2-results__options {
+                scrollbar-width: thin;
+            }
+            .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+                padding-left: 0px !important;
+                padding-right: 22px !important;
+            }
+            .select2-results__options {
+                scrollbar-width: thin;
+            }
+            .select2-container--bootstrap-5 .select2-dropdown .select2-results__options .select2-results__option.select2-results__option--highlighted {
+                color: black;
+                background-color: rgba(0, 0, 0, 0.015);
+            }
+            
+            .theme-dark .select2-dropdown .select2-results__options .select2-results__option.select2-results__option--highlighted {
+                color: white;                
+                background-color: rgba(255, 255, 255, 0.08);
+            }
+            .theme-dark .select2-selection {
+                background-color: var(--tblr-body-bg);
+                border-color: rgba(255, 255, 255, 0.08);
+            }
+            .theme-dark .select2-selection--single .select2-selection__rendered {
+                color: white;
+            }
+            .theme-dark .select2-dropdown {
+                color: white;
+                background-color: var(--tblr-body-bg);
+            }
+            .select2-container--bootstrap-5.select2-container--focus .select2-selection,
+            .select2-container--bootstrap-5.select2-container--open .select2-selection,
+            .select2-container--bootstrap-5 .select2-dropdown {
+                box-shadow: none;
+                border-color: #2563eb;
+                border-width: 2px;
+            }
+            .select2-results__option {
+                display: flex;
+                align-items: center;
+                height: 100% !important;
+            }
+            .select2-results__option img {
+                flex: 0 0 auto;
+            }
+            .select2-results__option .text {
+                flex: 1 1 auto;
+            }
+            .select2-container--bootstrap-5 .select2-dropdown .select2-results__options .select2-results__option.select2-results__option--selected {
+                color: black;
+                background-color: rgba(51, 5, 130, 0.04);
+            }
+            .theme-dark .select2-dropdown .select2-results__options .select2-results__option.select2-results__option--selected {
+                color: white;
+                background-color: var(--tblr-active-bg);
+            }
+            .select2-container--bootstrap-5.select2-container--disabled .select2-selection,
+            .select2-container--bootstrap-5.select2-container--disabled.select2-container--focus .select2-selection {
+                background-color: var(--tblr-body-bg);
+                border-color: rgba(255, 255, 255, 0.08);
+            }
+            .select2-container--bootstrap-5 .select2-dropdown.select2-dropdown--above {
+                border-top-right-radius: var(--tblr-border-radius);
+                border-top-left-radius: var(--tblr-border-radius);
+            }
+            .select2-container--bootstrap-5.select2-container--open.select2-container--above .select2-selection {
+                border-bottom-left-radius: var(--tblr-border-radius);
+                border-bottom-right-radius: var(--tblr-border-radius);
+            }
+            .select2-container--bootstrap-5 .select2-dropdown {
+                overflow: auto;
+            }
+            .select2-results__option--disabled {
+                display: none !important;
+            }
+            .small-text {
+                color: #667085;
+                font-family: 'Inter-Regular', sans-serif;
+                font-size: 12px;
+                line-height: 16px;
+                letter-spacing: 0.4px;
+                font-weight: 400;
+            }
+            .tag {
+                padding: 3px 7px 3px 7px;
+            }
+            .green-tag {
+                background-color: #1CA6851A !important;
+                color: #1CA685;
+            }
+            .red-tag {
+                background-color: #B82C2C1A !important;
+                color: #6D3232;
+            }
+            .yellow-tag {
+                background-color: #FBBC041A !important;
+                color: #FBBC04;
+            }
+            .grey-tag {
+                background-color: rgba(127, 127, 127, 0.2) !important;
+                color: rgba(0, 0, 0, 0.5) !important;
+            }
+            .theme-dark .grey-tag {
+                color: rgba(128, 128, 128, 1) !important;
+            }
+        `)
+        .appendTo('body');
+
+    /**
+     * Last-resort label when the card cannot be built — anything legible beats
+     * leaving 'Loading…' up permanently. `getModelInfo` is a pure lookup that
+     * guards its own inputs and cannot throw, so no defensive wrapper here.
+     */
+    function resolveModelInfoName(factory, modelInfoId) {
+        return factory.getModelInfo(modelInfoId)?.name || String(modelInfoId).split('|').pop();
+    }
+
+    /**
+     * Attaches model-info cards to select2 options. These are plain spans
+     * driven by tippy, not Bootstrap triggers, so only the factory's renderer
+     * is reused; content resolves lazily on first show and is cached on the
+     * closure.
+     */
+    function initializeModelInfoCards() {
+        // Exclude Bootstrap triggers (also carry data-model-info-id, driven by
+        // the factory's own initialize() path) — otherwise a second tippy
+        // tooltip binds onto every Bootstrap trigger already on the page.
+        const targets = document.querySelectorAll(
+            '[data-model-info-id]:not([data-model-info-bound]):not([data-bs-toggle])'
+        );
+        if (!targets.length) return;
+
+        const attach = (factory) => {
+            targets.forEach(target => {
+                target.setAttribute('data-model-info-bound', '1');
+                const modelInfoId = target.getAttribute('data-model-info-id');
+                if (!modelInfoId || target._tippy) return;
+
+                let cardPromise = null;
+
+                tippy(target, {
+                    content: 'Loading…',
+                    theme: 'tooltip',
+                    trigger: 'mouseenter',
+                    interactive: true,
+                    appendTo: () => document.body,
+                    arrow: false,
+                    onShow(instance) {
+                        // The placeholder must never be a resting state: fall back to
+                        // the model name, mirroring the Bootstrap path's
+                        // `title: () => getModelInfo(id)?.name || ' '`.
+                        if (!cardPromise) {
+                            cardPromise = factory.renderCard(modelInfoId)
+                                .catch(() => null)
+                                .then(element => instance.setContent(
+                                    element || resolveModelInfoName(factory, modelInfoId)
+                                ));
+                        }
+                        return true;
+                    },
+                });
+            });
+        };
+
+        if (typeof window.waitForModelInfoTooltip === 'function') {
+            waitForModelInfoTooltip(attach);
+        } else if (typeof window.ModelInfoTooltip === 'function') {
+            attach(window.ModelInfoTooltip());
+        }
+    }
+
+    function initializeTooltips(className) {
+        const targets = document.querySelectorAll(className);
+        targets.forEach(target => {
+            if (target._tippy) return;
+
+            tippy(target, {
+                content(reference) {
+                    const tooltipContent = reference.getAttribute('data-tooltip');
+                    return tooltipContent ? tooltipContent : null;
+                },
+                theme: 'tooltip',
+                trigger: 'mouseenter',
+                onShow(instance) {
+                    if (!instance.props.content) {
+                        return false;
+                    }
+                },
+                arrow: false,
+            });
+        });
+    };
+
+    function updateTagsForDarkMode() {
+        if ($('body').hasClass('theme-dark')) {
+            $('.tag').each(function() {
+                const $tag = $(this);
+                const darkBg = $tag.data('dark-background');
+                const darkText = $tag.data('dark-text');
+
+                if (darkBg) $tag.css('background-color', darkBg);
+                if (darkText) $tag.css('color', darkText);
+            });
+        }
+    }
+
+    $('.select2-image-option').each(function() {
+        const $select = $(this);
+        if ($select.hasClass('select2-hidden-accessible')) {
+            return;
+        }
+
+        $(this).addClass('select2 model_extra_field bg-[#fff] placeholder:text-black form-control form-select');
+        initializeTooltips('.tag');
+
+        const enableSearch = $select.attr('data-enable-search') === '1';
+        const searchPlaceholder = $select.attr('data-search-placeholder') || '';
+
+        const selectOptions = {
+            theme: 'bootstrap-5',
+            templateResult: formatOption,
+            templateSelection: formatOption,
+            minimumResultsForSearch: enableSearch ? 0 : Infinity,
+            width: '100%',
+            dropdownParent: $(this).parent(),
+        };
+
+        selectOptions.selectionCssClass = $select.attr("data-selectionCssClass");
+        selectOptions.dropdownCssClass = $select.attr("data-dropdownCssClass");
+
+        const select = $select.select2(selectOptions);
+        
+        let currentValue = select.val();
+        let permission = false;
+        let isOpen = false;
+
+        if ($select.attr('name').includes('model')) {
+            ReactStateManager.partialUpdate("agentCostWarningProps", {
+                totalCredits: undefined,
+                modelCredits: undefined
+            });
+        }
+
+        select.on('change', function() {
+            currentValue = $(this).val();
+
+            if ($select.attr('name').includes('model')) {
+                ReactStateManager.partialUpdate("agentCostWarningProps", {
+                    totalCredits: undefined,
+                    modelCredits: undefined
+                });
+            }
+        });
+
+        select.next('.select2').on('click', function(e) {
+            const clickwasOnTooltip = !!e.target?.closest('#tooltip-icon-wrapper');
+            
+            if (!clickwasOnTooltip) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                permission = true;
+                if (isOpen) {
+                    select.select2('close');
+                    isOpen = false;
+                } else {
+                    select.val(null).select2('open');
+                    isOpen = true;
+                }
+                permission = false;
+            }
+        });
+
+        select.on('select2:open', function() {
+            isOpen = false;
+            if (enableSearch) {
+                const $searchField = $('.select2-container--open .select2-search__field');
+                if (searchPlaceholder) {
+                    $searchField.attr('placeholder', searchPlaceholder);
+                }
+                $searchField.trigger('focus');
+            }
+            setTimeout(function() {
+                initializeTooltips('.tag');
+                initializeModelInfoCards();
+                updateTagsForDarkMode();
+            }, 1);
+        });
+
+        select.on('select2:opening', function(e) {
+            const hasTooltip = select.next('.select2').find('#tooltip-icon-wrapper');
+
+            if (hasTooltip.length > 0 && !permission) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                isOpen = false;
+            }
+        });
+
+        select.on('select2:selecting', function(e) {
+            e.preventDefault();
+            if (!e.params?.args?.originalEvent?.target?.closest('#tooltip-icon-wrapper')) {
+                currentValue = e.params.args.data.id;
+                select.val(currentValue).trigger('change');
+                select.select2('close');
+            }
+        });
+
+        select.on('select2:closing', function() {
+            if (!select.val()) {
+                select.val(currentValue);
+            }
+            initializeTooltips('.tag');
+            updateTagsForDarkMode();
+        });
+    });
+
+    updateTagsForDarkMode();
+};
+

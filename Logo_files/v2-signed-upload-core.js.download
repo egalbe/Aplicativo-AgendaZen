@@ -1,0 +1,63 @@
+(function () {
+    'use strict';
+
+    async function signAndPutToGcs(file, { signUrl, csrfToken }) {
+        const contentType = file.type || 'application/octet-stream';
+
+        const signResponse = await fetch(signUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify({
+                filename: file.name,
+                content_type: contentType,
+                size: file.size,
+            }),
+        });
+
+        if (signResponse.status === 404) {
+            return { ok: false, reason: 'feature-off' };
+        }
+
+        if (!signResponse.ok) {
+            const errBody = await signResponse.json().catch(() => ({}));
+            throw new Error(
+                (errBody && errBody.message) ||
+                `Failed to prepare upload (HTTP ${signResponse.status})`
+            );
+        }
+
+        const { uploadUrl, objectPath, requiredHeaders } = await signResponse.json();
+
+        await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', uploadUrl, true);
+            Object.entries(requiredHeaders || {}).forEach(([name, value]) => {
+                xhr.setRequestHeader(name, value);
+            });
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    resolve();
+                } else {
+                    const messageMatch = (xhr.responseText || '').match(/<Message>([^<]+)<\/Message>/);
+                    reject(new Error(messageMatch ? messageMatch[1] : `GCS upload failed (HTTP ${xhr.status})`));
+                }
+            };
+            xhr.onerror = () => reject(new Error('Network error during upload'));
+            xhr.onabort = () => reject(new Error('Upload aborted'));
+            xhr.send(file);
+        });
+
+        return {
+            ok: true,
+            objectPath,
+            contentType,
+            filename: file.name,
+        };
+    }
+
+    window.__tessV2SignedUpload = { signAndPutToGcs };
+})();

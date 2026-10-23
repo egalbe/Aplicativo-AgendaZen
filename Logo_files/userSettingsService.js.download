@@ -1,0 +1,44 @@
+/**
+ * UserSettingsService - A service class for handling user settings operations
+ * This class provides methods to get and set user settings that can be reused across the application
+ */
+class UserSettingsService {
+    /**
+     * Get user settings based on provided filters
+     * @param {Object} data - The filter data to use for the request
+     * @returns {Promise} - jQuery AJAX promise
+     */
+    getUserSetting(data) {
+        return $.ajax({
+            type: "GET",
+            url: '/dashboard/user/user-settings',
+            contentType: "application/json",
+            data: {
+                filters: JSON.stringify(data)
+            }
+        });
+    }
+
+    /**
+     * Set user settings
+     * @param {Object} data - The data to save as user settings
+     * @returns {Promise} - jQuery AJAX promise
+     */
+    setUserSetting(data) {
+        return $.ajax({
+            type: "POST",
+            url: '/dashboard/user/user-settings',
+            contentType: "application/json",
+            data: JSON.stringify(data)
+        });
+    }
+}
+
+// Create a singleton instance
+let userSettingsServiceInstance = null;
+window.getUserSettingsService = function() {
+    if (!userSettingsServiceInstance) {
+        userSettingsServiceInstance = new UserSettingsService();
+    }
+    return userSettingsServiceInstance;
+} 

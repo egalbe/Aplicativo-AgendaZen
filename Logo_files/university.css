@@ -1,0 +1,1070 @@
+/* University Modal Styles - Migrated from university.blade.php */
+
+/* University Modal Specific Overrides */
+.university-modal .tess-modal-container {
+    display: flex;
+    height: 80vh !important;
+    max-height: 80vh !important;
+    background: var(--tess-modal-bg, #1a1a1a);
+    border-radius: 12px;
+    overflow: hidden !important;
+}
+
+.university-modal .tess-sidebar {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+    max-height: 80vh !important;
+}
+
+.university-modal .tess-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    max-height: 80vh !important;
+    overflow: hidden;
+}
+
+.university-modal .tess-content-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    max-height: calc(80vh - 4.5rem) !important;
+}
+
+/* Mobile specific overrides for University modal */
+@media (max-width: 768px) {
+    .university-modal .tess-modal-container {
+        height: 100vh !important;
+        max-height: 100vh !important;
+        min-height: 100vh !important;
+        border-radius: 0 !important;
+    }
+    
+    .university-modal .tess-sidebar {
+        max-height: 100vh !important;
+    }
+    
+    .university-modal .tess-content {
+        max-height: 100vh !important;
+    }
+    
+    .university-modal .tess-content-body {
+        max-height: calc(100vh - 4.5rem) !important;
+    }
+    
+    /* Ensure modal takes full screen on mobile */
+    .university-modal.modal-content {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        min-width: 100vw !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+    }
+    
+    /* Ensure proper scrolling in content area */
+    .university-modal .university-step-content-container {
+        height: 100%;
+        overflow-y: auto;
+        padding: 1rem;
+    }
+    
+
+}
+
+/* Start Course Button Styles */
+.university-start-course-btn {
+    background-image: linear-gradient(270deg, #FF6503, #FF1D43, #D802D2, #8F00FF, #3200FF, #8F00FF, #D802D2, #FF1D43, #FF6503);
+    background-size: 800% auto;
+    animation: universityGradientBackground 90s linear infinite;
+}
+
+.university-start-course-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.university-sidebar-title {
+    color: #8d8d8d;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.031rem;
+    margin: 0 0 0.5rem 1rem;
+    padding: 0;
+}
+
+.theme-dark .university-sidebar-title {
+    color: #8d8d8d;
+}
+
+@keyframes universityGradientBackground {
+    0% { background-position: 0% center; }
+    100% { background-position: 800% center; }
+}
+
+/* Progress Bar Styles */
+.university-progress-bar {
+    position: relative;
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.university-progress-bar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 200%;
+    height: 100%;
+    background: linear-gradient(270deg, #ff0080, #ff8c00, #40e0d0);
+    background-size: 400% 400%;
+    animation: universityProgressGradient 5s ease infinite;
+}
+
+@keyframes universityProgressGradient {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* Rank Icon Glow Effect */
+.university-rank-icon-glow, .rank-icon-glow {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.university-rank-icon-glow::after, .rank-icon-glow::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 70%);
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+}
+
+.university-rank-icon-glow:hover::after, .rank-icon-glow:hover::after {
+    opacity: 0.2;
+}
+
+/* Text Gradient Animation */
+.university-animate-gradient-text {
+    background: linear-gradient(270deg, #ff0080, #ff8c00, #40e0d0);
+    background-size: 400% 400%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
+    animation: universityTextGradient 2s linear forwards;
+}
+
+@keyframes universityTextGradient {
+    0% {
+        background-position: 0% 50%;
+    }
+    100% {
+        background-position: 100% 50%;
+    }
+}
+
+/* Pulse Animation */
+@keyframes universityPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.university-pulse {
+    display: inline-block;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(255,255,255,0.3);
+    animation: universityPulse 1s ease-in-out;
+}
+
+/* Progress Pulse */
+@keyframes universityProgressPulse {
+    0% {
+        transform: scaleY(1);
+    }
+    50% {
+        transform: scaleY(1.2);
+    }
+    100% {
+        transform: scaleY(1);
+    }
+}
+
+.university-progress-pulse {
+    animation: universityProgressPulse 0.5s ease-in-out;
+}
+
+/* Fireworks Animation */
+@keyframes universityFirework {
+    0% {
+        transform: translate(var(--x), var(--initialY)) scale(1.2);
+        width: var(--initialSize);
+        opacity: 1;
+    }
+    50% {
+        width: 1vmin;
+        opacity: 1;
+    }
+    100% {
+        width: var(--finalSize);
+        opacity: 0;
+    }
+}
+
+.university-fireworks-container {
+    position: absolute;
+    top: 50%;
+    left: 100%;
+    transform: translate(-50%, -50%);
+    width: 50px;
+    height: 50px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.university-firework,
+.university-firework::before,
+.university-firework::after {
+    --initialSize: 1vmin;
+    --finalSize: 1.2vmin;
+    --particleSize: 0.5vmin;
+    --color1: yellow;
+    --color2: khaki;
+    --color3: white;
+    --color4: lime;
+    --color5: gold;
+    --color6: mediumseagreen;
+    --y: -30vmin;
+    --x: -50%;
+    --initialY: 60vmin;
+    content: "";
+    animation: universityFirework 1.5s ease-out forwards;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, var(--y));
+    width: var(--initialSize);
+    aspect-ratio: 1;
+    background: radial-gradient(circle, var(--color1) var(--particleSize), #0000 0) 0% 0%,
+        radial-gradient(circle, var(--color2) var(--particleSize), #0000 0) 100% 0%,
+        radial-gradient(circle, var(--color3) var(--particleSize), #0000 0) 100% 100%,
+        radial-gradient(circle, var(--color4) var(--particleSize), #0000 0) 0% 100%,
+        radial-gradient(circle, var(--color5) var(--particleSize), #0000 0) 50% 0%,
+        radial-gradient(circle, var(--color6) var(--particleSize), #0000 0) 50% 100%,
+        radial-gradient(circle, var(--color1) var(--particleSize), #0000 0) 0% 50%,
+        radial-gradient(circle, var(--color2) var(--particleSize), #0000 0) 100% 50%,
+        radial-gradient(circle, var(--color3) var(--particleSize), #0000 0) 50% 50%;
+    background-size: var(--initialSize) var(--initialSize);
+    background-repeat: no-repeat;
+}
+
+.university-firework::before {
+    --x: -50%;
+    --y: -50%;
+    --initialY: -50%;
+    transform: translate(-50%, -50%) rotate(40deg) scale(1.3) rotateY(40deg);
+}
+
+.university-firework::after {
+    --x: -50%;
+    --y: -50%;
+    --initialY: -50%;
+    transform: translate(-50%, -50%) rotate(170deg) scale(1.15) rotateY(-30deg);
+}
+
+.university-firework:nth-child(2) {
+    --x: 30vmin;
+}
+
+.university-firework:nth-child(2),
+.university-firework:nth-child(2)::before,
+.university-firework:nth-child(2)::after {
+    --color1: pink;
+    --color2: violet;
+    --color3: fuchsia;
+    --color4: orchid;
+    --color5: plum;
+    --color6: lavender;
+    --finalSize: 50vmin;
+    left: 30%;
+    top: 60%;
+    animation-delay: -0.25s;
+}
+
+.university-firework:nth-child(3) {
+    --x: -30vmin;
+    --y: -50vmin;
+}
+
+.university-firework:nth-child(3),
+.university-firework:nth-child(3)::before,
+.university-firework:nth-child(3)::after {
+    --color1: cyan;
+    --color2: lightcyan;
+    --color3: lightblue;
+    --color4: PaleTurquoise;
+    --color5: SkyBlue;
+    --color6: lavender;
+    --finalSize: 45vmin;
+    left: 70%;
+    top: 60%;
+    animation-delay: -0.4s;
+}
+
+/* Rank Change Animation */
+@keyframes universityRankChange {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.university-rank-change {
+    animation: universityRankChange 1s ease-in-out;
+}
+
+/* Glassmorphism Effect */
+.university-glassmorphism {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+/* Engagement Elements Animation */
+.university-engagement-elements #ranking-label {
+    animation: universityFadeOut 5s forwards;
+    background-image: linear-gradient(270deg, #ff0080, #ff8c00, #40e0d0, #ff0080);
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: universityGradient 5s linear infinite, universityFadeOut 5s forwards;
+}
+
+.university-engagement-elements #ranking-title {
+    animation: universityFadeOut 5s forwards;
+    background-image: linear-gradient(270deg, #ff0080, #ff8c00, #40e0d0, #ff0080);
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: universityGradient 5s linear infinite, universityFadeOut 5s forwards;
+}
+
+@keyframes universityGradient {
+    0% { background-position: 0% center; }
+    100% { background-position: 200% center; }
+}
+
+@keyframes universityFadeOut {
+    0% { opacity: 1; }
+    100% { opacity: 0.8; }
+}
+
+/* Custom Classes for Dark Mode Support */
+/* Content Wrapper */
+.university-content-wrapper {
+    background-color: #f8f9fa;
+}
+
+.theme-dark .university-content-wrapper {
+    background-color: #1a1a1a;
+}
+
+/* Content Inner */
+.university-content-inner {
+    color: #333;
+}
+
+.theme-dark .university-content-inner {
+    color: #e9ecef;
+}
+
+/* Chapter Header */
+.university-title {
+    color: #212529;
+}
+
+.theme-dark .university-title {
+    color: #fff;
+}
+
+.university-subtitle {
+    color: #6c757d;
+}
+
+.theme-dark .university-subtitle {
+    color: #adb5bd;
+}
+
+/* Progress Container */
+.university-progress-container {
+    background-color: #fff;
+    border: 1px solid #e9ecef;
+}
+
+.theme-dark .university-progress-container {
+    background-color: #2c2c2c;
+    border: 1px solid #444;
+}
+
+.university-progress-label {
+    color: #495057;
+}
+
+.theme-dark .university-progress-label {
+    color: #ced4da;
+}
+
+.university-progress-count {
+    color: #6c757d;
+}
+
+.theme-dark .university-progress-count {
+    color: #adb5bd;
+}
+
+.university-progress-bar-bg {
+    background-color: #e9ecef;
+}
+
+.theme-dark .university-progress-bar-bg {
+    background-color: #495057;
+}
+
+.university-progress-bar-fill {
+    background-color: #0d6efd;
+}
+
+/* Module */
+.university-module {
+    background-color: #fff;
+    border: 1px solid #e9ecef;
+}
+
+.theme-dark .university-module {
+    background-color: #2c2c2c;
+    border: 1px solid #444;
+}
+
+.university-module-header {
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.theme-dark .university-module-header {
+    border-bottom: 1px solid #343a40;
+}
+
+.university-module-header:hover {
+    background-color: #f8f9fa;
+}
+
+.theme-dark .university-module-header:hover {
+    background-color: #343a40;
+}
+
+.university-module-title {
+    color: #212529;
+}
+
+.theme-dark .university-module-title {
+    color: #fff;
+}
+
+.university-module-subtitle {
+    color: #6c757d;
+}
+
+.theme-dark .university-module-subtitle {
+    color: #adb5bd;
+}
+
+/* Step Items */
+.university-step-item {
+    border-top: 1px solid #f8f9fa;
+}
+
+.theme-dark .university-step-item {
+    border-top: 1px solid #343a40;
+}
+
+.university-step:hover {
+    background-color: #f8f9fa;
+}
+
+.theme-dark .university-step:hover {
+    background-color: #343a40;
+}
+
+.university-step-title {
+    color: #212529;
+}
+
+.theme-dark .university-step-title {
+    color: #e9ecef;
+}
+
+.university-step-completed {
+    color: #6c757d !important;
+    text-decoration: line-through;
+}
+
+.theme-dark .university-step-completed {
+    color: #868e96 !important;
+}
+
+.university-checkbox-completed {
+    background-color: #0d6efd;
+    border: 1px solid #0d6efd;
+}
+
+.university-checkbox-uncompleted {
+    background-color: #fff;
+    border: 2px solid #ced4da;
+}
+
+.theme-dark .university-checkbox-uncompleted {
+    background-color: #343a40;
+    border: 2px solid #495057;
+}
+
+
+.university-pagination {
+    color: #6c757d;
+}
+
+.theme-dark .university-pagination {
+    color: #adb5bd;
+}
+
+.university-next-btn {
+    background-color: #0d6efd;
+    border: 1px solid #0d6efd;
+}
+
+.university-next-btn:hover:not(:disabled) {
+    background-color: #0b5ed7;
+}
+
+/* Steps View Objects */
+.university-steps-view {
+    border-top-color: #dee2e6;
+}
+
+.theme-dark .university-steps-view {
+    border-top-color: #495057;
+}
+
+.university-steps-view-title {
+    color: #212529;
+}
+
+.theme-dark .university-steps-view-title {
+    color: #fff;
+}
+
+.university-step-view-card {
+    background-color: #fff;
+    border: 1px solid #e9ecef;
+}
+
+.theme-dark .university-step-view-card {
+    background-color: #2c2c2c;
+    border: 1px solid #444;
+}
+
+.university-step-view-icon {
+    background-color: #e9ecef;
+    color: #495057;
+}
+
+.theme-dark .university-step-view-icon {
+    background-color: #343a40;
+    color: #ced4da;
+}
+
+.university-step-view-title {
+    color: #212529;
+}
+
+.theme-dark .university-step-view-title {
+    color: #fff;
+}
+
+.university-step-view-description {
+    color: #6c757d;
+}
+
+.theme-dark .university-step-view-description {
+    color: #adb5bd;
+}
+
+.university-step-view-link {
+    color: #0d6efd;
+}
+
+.theme-dark .university-step-view-link {
+    color: #6ea8fe;
+}
+
+.university-step-view-link:hover {
+    color: #0a58ca;
+    text-decoration: underline;
+}
+
+.theme-dark .university-step-view-link:hover {
+    color: #9ec5fe;
+}
+
+/* Mobile Styles */
+
+/* Desktop specific styles */
+@media (min-width: 769px) {
+    #personalSettingsModal.modal-dialog {
+        max-width: 57.375rem;
+        margin: 2rem auto;
+        padding: 0;
+        display: flex;
+        height: 80vh !important;
+        border-radius: 12px;
+        overflow-y: auto;
+    }
+}
+
+/* Dark mode adjustments */
+.dark .university-glassmorphism {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+/* Sidebar Custom Styles */
+.university-sidebar {
+
+    width: 221px;
+    background: var(--tess-sidebar-bg, #f8f9fa);
+    border-right: 1px solid var(--tess-border-color, rgba(0, 0, 0, .1));
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+.theme-dark .university-sidebar {
+    background: #1a1a1a;
+    border-right: 1px solid #343a40;
+}
+
+/* Logo container styles - matching SettingsSidebar */
+.university-sidebar .tess-logo-container {
+    width: 13.75rem;
+    height: 3.875rem;
+    padding: 1.25rem 1.25rem .75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: left;
+}
+
+.university-sidebar .tess-logo {
+    height: 1.5rem;
+    width: auto;
+}
+
+.university-sidebar .tess-logo-light-mode {
+    display: block;
+}
+
+.university-sidebar .tess-logo-dark-mode {
+    display: none;
+}
+
+.theme-dark .university-sidebar .tess-logo-light-mode {
+    display: none;
+}
+
+.theme-dark .university-sidebar .tess-logo-dark-mode {
+    display: block;
+}
+.university-sidebar-widget {
+    border-bottom: none;
+}
+.theme-dark .university-sidebar-widget {
+    border-bottom: none;
+}
+.university-sidebar-rank {
+    color: #212529;
+}
+.theme-dark .university-sidebar-rank {
+    color: #fff;
+}
+.university-sidebar-progress-bar {
+    background: #dee2e6;
+}
+.theme-dark .university-sidebar-progress-bar {
+    background: #495057;
+}
+.university-sidebar-list {
+    display: flex;
+    flex-direction: column;
+    gap: .125rem;
+    padding: 0 .5rem 1rem;
+}
+.university-sidebar-chapter {
+    transition: background 0.2s, color 0.2s;
+    font-size: 0.75rem;
+    border-radius: 0.25rem;
+}
+.university-sidebar-chapter-active {
+    background: #e5e7eb;
+    color: #1f2937;
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.theme-dark .university-sidebar-chapter-active {
+    background: #343435;
+    color: #f9fafb;
+}
+.university-sidebar-chapter-inactive {
+    color: #495057;
+}
+.theme-dark .university-sidebar-chapter-inactive {
+    color: #adb5bd;
+}
+.university-sidebar-chapter:hover {
+    background: #f8f9fa;
+}
+.theme-dark .university-sidebar-chapter:hover {
+    background: #343a40;
+}
+.university-sidebar-chapter-title {
+    color: #212529;
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.theme-dark .university-sidebar-chapter-title {
+    color: #fff;
+}
+.university-sidebar-chapter-subtitle {
+    color: #6c757d;
+    font-size: 0.7rem;
+    line-height: 0.9rem;
+    font-weight: normal;
+}
+.theme-dark .university-sidebar-chapter-subtitle {
+    color: #adb5bd;
+}
+.university-sidebar-chapter-chevron {
+    color: #1f2937;
+    min-width: 0.75rem;
+    min-height: 0.75rem;
+}
+.theme-dark .university-sidebar-chapter-chevron {
+    color: #f9fafb;
+}
+
+/* Módulo expandido */
+.university-sidebar-module-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
+    font-size: 0.7rem;
+    animation: slideDown 0.2s ease-out;
+}
+
+.university-sidebar-step {
+    border-radius: 0.125rem;
+    transition: background-color 0.15s ease-in-out;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+}
+
+.theme-dark .university-sidebar-step {
+    color: #d1d5db;
+}
+
+.university-sidebar-step:hover {
+    background-color: #f3f4f6;
+}
+
+.theme-dark .university-sidebar-step:hover {
+    background-color: #374151;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-0.5rem);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.university-sidebar-footer {
+    padding: 1.5rem;
+    border-top: 1px solid #e9ecef;
+}
+.theme-dark .university-sidebar-footer {
+    border-top: 1px solid #343a40;
+}
+.university-sidebar-footer-text {
+    color: #adb5bd;
+    margin-top: 0.75rem;
+}
+.theme-dark .university-sidebar-footer-text {
+    color: #8d8d8d;
+}
+
+/* Ranking icon in footer */
+#ranking-icon {
+    animation: universityPulse 2s infinite;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#ranking-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Tess Content Header — mesmo fundo que .tess-content / .tess-content-body (tokens) */
+.tess-content-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 0.062rem solid var(--border-main);
+    background: var(--background-menu-white);
+}
+
+.theme-dark .tess-content-header {
+    background: var(--background-menu-white);
+    border-bottom: 0.062rem solid var(--border-main);
+}
+
+/* University specific overrides */
+.university-modal .tess-content-body {
+    padding: 0 !important;
+}
+
+.university-modal .tess-content-body .university-step-content-container {
+    padding: 1rem;
+}
+
+@media (max-width: 768px) {
+    .university-modal .tess-content-body .university-step-content-container {
+        padding: 0.5rem;
+    }
+}
+
+.university-sidebar-list {
+  scrollbar-width: none;
+}
+.university-sidebar-list::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .university-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100dvh;
+    width: 221px;
+    z-index: 60;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    background: transparent; /* Remove background da container externa */
+    pointer-events: none; /* Não captura cliques quando fechada */
+  }
+  
+  .university-sidebar-inner {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--tess-sidebar-bg, #f8f9fa);
+    border-right: 1px solid var(--tess-border-color, rgba(0, 0, 0, .1));
+    pointer-events: auto; /* Reativa cliques no conteúdo da sidebar */
+  }
+  
+  .theme-dark .university-sidebar-inner {
+    background: #1a1a1a;
+    border-right: 1px solid #343a40;
+  }
+  
+  .university-sidebar-inner.mobile-open {
+    transform: translateX(0);
+  }
+  .university-mobile-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 50;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .university-mobile-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .university-sidebar .tess-logo-container {
+    display: flex !important;
+    padding: 1.25rem 1.25rem 0.75rem 1.5rem !important;
+    align-items: center;
+    justify-content: left;
+  }
+}
+
+.tess-mobile-menu-btn {
+  background: none !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0.5rem !important;
+  box-shadow: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tess-mobile-menu-btn svg {
+  width: 24px;
+  height: 24px;
+  color: #1f2937;
+}
+.theme-dark .tess-mobile-menu-btn svg {
+  color: #f9fafb;
+}
+
+/* The shared .tess-close-btn styles live in PersonalSettingsModal.css, which is
+   not loaded on the panel where this modal renders, so scope them here too. */
+.university-modal .tess-close-btn {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.university-modal .tess-close-btn:hover {
+  background: var(--fill-tsp-gray-main) !important;
+  color: var(--text-primary);
+}
+.university-modal .tess-close-btn:focus-visible {
+  outline: 2px solid var(--border-focus, var(--color-brand-medium, #1b7a8c));
+  outline-offset: 2px;
+}
+
+.university-sidebar-inner,
+.university-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.university-sidebar-list {
+  flex: 1 1 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+@media (max-width: 768px) {
+  .modal-content,
+  .tess-settings-modal.modal-content {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+}
+
+@media (max-width: 768px) {
+  #personalSettingsModal .tess-modal-container {
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .university-sidebar {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .university-sidebar-inner {
+    background: var(--tess-sidebar-bg, #f8f9fa) !important;
+    border-right: 1px solid var(--tess-border-color, rgba(0, 0, 0, .1)) !important;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1) !important;
+  }
+  .theme-dark .university-sidebar-inner {
+    background: #1a1a1a !important;
+    border-right: 1px solid #343a40 !important;
+  }
+}
+
+/* University Navigation Footer - Desktop */
+.university-navigation-footer {
+  border-top: 1px solid var(--tess-border-color, rgba(0, 0, 0, .1));
+  background: var(--tess-content-bg, #fff);
+  padding: 1rem;
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+.theme-dark .university-navigation-footer {
+  background: #1a1a1a;
+  border-top: 1px solid #343a40;
+}
+
+/* Mobile adjustments */
+@media (max-width: 991px) {
+  .university-navigation-footer {
+    margin-top: 0;
+    padding: 1rem;
+    border-top: 1px solid var(--tess-border-color, rgba(0, 0, 0, .1));
+    background: var(--tess-content-bg, #fff);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Ensure content doesn't get hidden behind fixed footer */
+  .university-step-content-container {
+    padding-bottom: 4.5rem !important;
+  }
+}
+
+/* Content area adjustments for footer */
+.university-step-content-container {
+  height: 100%;
+  overflow-y: auto;
+}
+

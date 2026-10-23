@@ -1,0 +1,128 @@
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+    padding: 0 !important;
+    position: relative !important;
+    border: none !important;
+}
+.select2-container {
+    width: 100% !important;
+    z-index: 9999;
+}
+
+
+.select2-container--default .select2-selection--single {
+    font-size: 0.8125rem;
+    line-height: 1.4285714286;
+    border-radius: var(--tblr-border-radius) !important;
+    --tblr-border-color: rgb(255 255 255 / 8%);
+    background-color: #fff;
+
+    padding: 0.63em 0.823em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 100%;
+    transition: border-color .15s ease-in-out;
+    border: var(--tblr-border-width) solid #e4e6ea;
+}
+
+.theme-dark .select2-container--default .select2-selection--single {
+    border: var(--tblr-border-width) solid var(--tblr-border-color);
+    background-color: transparent;
+    margin: -1px;
+}
+
+.select2-container--default .select2-selection--single:focus {
+    border-color: #2563eb;
+    transition: border-color .15s ease-in-out;
+    background-color: transparent;
+    border-width: 2px;
+    margin: -2px;
+}
+
+.select2-container--default.select2-container--disabled .select2-selection--single {
+    background-color: var(--tblr-bg-surface-secondary);
+    border: 1px var(--tblr-border-style) rgba(97,104,118,.16);
+}
+.select2-container--default.select2-container--disabled .select2-selection--single:focus {
+    border-color: initial;
+    border: 1px var(--tblr-border-style) rgba(97,104,118,.16);
+    margin: -1px;
+}
+
+.select2-container--default.select2-container--disabled .select2-selection--single:focus .select2-selection__arrow{
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+}
+.theme-dark .select2-container--default.select2-container--disabled .select2-selection--single {
+    background-color: transparent;
+    border: 1px var(--tblr-border-style) rgba(97,104,118,.16);
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice {
+    padding: 2px 10px;
+    margin: 0;
+    border: 0;
+    border-radius: 5em;
+    background-color: #efefef;
+}
+
+.img-option-select2 {
+    margin-right: 4px;
+}
+.option-select2 {
+    display: flex;
+    align-items: center;
+    font-weight: normal;
+    white-space: nowrap;
+    font-size: 0.8125rem;
+}
+
+.theme-dark .select2-container--default .select2-selection--single .select2-selection__rendered { /* Selected Option */
+    color: #fff;
+}
+
+.select2-container--default .select2-selection--single .select2-selection__arrow {
+    position: relative;
+}
+.select2-container--default .select2-selection--single .select2-selection__arrow b {
+    position: relative;
+    display: none;
+}
+.select2-container .select2-selection--single .select2-selection__arrow {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-size: 20px 20px; /* Tamanho da sua imagem */
+    background-repeat: no-repeat;
+    background-position: right center; /* Posição da imagem */
+    margin-top: -2px;
+    margin-right: -4px;
+}
+.select2-container--default .select2-selection--single:focus .select2-selection__arrow{
+    background-image: none;
+}
+
+/*Options Dropdown Select2 */
+.select2-container--default .select2-results__option span {
+    margin-left: 8px;
+}
+.theme-dark .select2-container--default .select2-results__option {
+    color: black;
+    font-family: var(--tblr-font-sans-serif);
+}
+.theme-dark .select2-container--default .select2-results__option:hover {
+    color: #fff;
+}
+
+.select2-container--default.select2-container--open .select2-selection--single .select2-selection__arrow b {
+    display: none;
+}
+
+.select2-results__option {
+    height: 28px;
+    width: 100%;
+    display: flex;
+    justify-content: start;
+}
+.select2-results__option:hover {
+    background-color: #0A95FF;
+    color: #fff;
+}

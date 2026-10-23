@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+  <defs>
+    <clipPath id="clip">
+      <circle cx="12" cy="12" r="12"/>
+    </clipPath>
+    <path id="star" d="M0-1L0.2245-0.309L0.9511-0.309L0.3633 0.118L0.5878 0.809L0 0.382L-0.5878 0.809L-0.3633 0.118L-0.9511-0.309L-0.2245-0.309Z" fill="#FFFFFF"/>
+  </defs>
+  <circle cx="12" cy="12" r="12" fill="#F0F0F0"/>
+  <g clip-path="url(#clip)">
+    <rect x="0" y="0" width="24" height="24" fill="#FFFFFF"/>
+    <rect x="0" y="0" width="24" height="1.8462" fill="#D80027"/>
+    <rect x="0" y="3.6923" width="24" height="1.8462" fill="#D80027"/>
+    <rect x="0" y="7.3846" width="24" height="1.8462" fill="#D80027"/>
+    <rect x="0" y="11.0769" width="24" height="1.8462" fill="#D80027"/>
+    <rect x="0" y="14.7692" width="24" height="1.8462" fill="#D80027"/>
+    <rect x="0" y="18.4615" width="24" height="1.8462" fill="#D80027"/>
+    <rect x="0" y="22.1538" width="24" height="1.8462" fill="#D80027"/>
+    <rect x="0" y="0" width="9.6" height="12.9231" fill="#0052B4"/>
+    <use href="#star" transform="translate(2.4 3.2308) scale(0.9)"/>
+    <use href="#star" transform="translate(4.8 3.2308) scale(0.9)"/>
+    <use href="#star" transform="translate(7.2 3.2308) scale(0.9)"/>
+    <use href="#star" transform="translate(2.4 6.4615) scale(0.9)"/>
+    <use href="#star" transform="translate(4.8 6.4615) scale(0.9)"/>
+    <use href="#star" transform="translate(7.2 6.4615) scale(0.9)"/>
+    <use href="#star" transform="translate(2.4 9.6923) scale(0.9)"/>
+    <use href="#star" transform="translate(4.8 9.6923) scale(0.9)"/>
+    <use href="#star" transform="translate(7.2 9.6923) scale(0.9)"/>
+  </g>
+</svg>

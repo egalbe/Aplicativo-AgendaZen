@@ -1,0 +1,503 @@
+let searchResultsVisible = false;
+let currentPage = {
+	recents: 1,
+    templates: 1,
+    workspaces: 1,
+    myais: 1,
+    adminlinks: 1
+};
+let noMorePagesAvailable = {
+	recents: false,
+    templates: false,
+    workspaces: false,
+    myais: false,
+    adminlinks: false
+};
+let lastSearchTerms = {
+    recents: '',
+    templates: '',
+    workspaces: '',
+    myais: '',
+    adminlinks: ''
+};
+let currentTab = 'recents';
+var timer = null;
+let justOpenedModal = true;
+
+document.addEventListener('DOMContentLoaded', function() {
+	const searchInput = document.querySelector('#modal-search-input');
+	const searchShortcutKey = document.querySelector('#search-shortcut-key');
+
+	if (!searchInput) {
+		return;
+	}
+
+	const navbarSearch = document.querySelector('#navbar-search');
+	let inputFocused = false;
+
+	let skipModalShownEvent = false;
+	const searchModal = document.getElementById('search-modal');
+	searchModal.addEventListener('shown.bs.modal', function() {
+		if (skipModalShownEvent) {
+			skipModalShownEvent = false;
+			return;
+		}
+		
+		searchFunction(null, 'recents');
+		searchFunction(null, 'templates');
+		searchFunction(null, 'workspaces');
+		searchFunction(null, 'myais');
+		const adminlinksTab = document.getElementById('adminlinks-tab');
+		if (adminlinksTab) {
+			searchFunction(null, 'adminlinks');
+		}
+		searchInput.focus();
+		searchInput.select();
+	});
+
+	const searchResults = document.getElementById('search-results');
+	if (searchResults) {
+		searchResults.addEventListener("scroll", handleScroll);
+	}
+
+	if (searchShortcutKey) {
+		searchShortcutKey.innerText = (navigator.userAgent.indexOf('Mac OS X') != -1) ? 'cmd' : 'ctrl';
+		searchShortcutKey.parentElement.classList.remove('opacity-0');
+	}
+
+	const addClassToNavbarSearch = (className) => {
+		if (navbarSearch) {
+			navbarSearch.classList.add(className);
+		}
+	};
+
+	const removeClassFromNavbarSearch = (className) => {
+		if (navbarSearch) {
+			navbarSearch.classList.remove(className);
+		}
+	};
+
+	searchInput.addEventListener('focus', function () {
+		searchResultsVisible = true;
+		if (!onlySpaces(searchInput.value)) {
+			addClassToNavbarSearch('done-searching');
+		}
+		inputFocused = true;
+		searchShortcutKey.parentElement.classList.add('opacity-0');
+	});
+
+	searchInput.addEventListener('keyup', function () {
+		addClassToNavbarSearch('is-searching');
+		clearTimeout(timer);
+		timer = setTimeout(() => {
+			searchFunction(null, currentTab);
+		  }, 1000);
+	});
+
+	window.addEventListener('keydown', function (e) {
+		if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'k') {
+			e.preventDefault();
+			e.stopPropagation();
+			
+			if (!window.tessSearchEnabled) {
+				return;
+			}
+			
+			const adminlinksTab = document.getElementById('adminlinks-tab');
+			if (!adminlinksTab) {
+				return;
+			}
+			
+		if (!$('#search-modal').hasClass('show')) {
+			skipModalShownEvent = true;
+			$('#search-modal').one('shown.bs.modal', function() {
+				adminlinksTab.click();
+				searchFunction(null, 'adminlinks');
+				searchInput.focus();
+				searchInput.select();
+			});
+			$('#search-modal').modal('show');
+		} else {
+			adminlinksTab.click();
+			searchInput.focus();
+			searchInput.select();
+		}
+			return;
+		}
+		
+		if (((e.ctrlKey || e.altKey || e.metaKey) && !e.shiftKey) && e.key === 'k') {
+			e.preventDefault();
+			e.stopPropagation();
+			
+			// Check if user has permission to use search
+			if (!window.tessSearchEnabled) {
+				return;
+			}
+			
+			if (!$('#search-modal').hasClass('show')) {
+                $('#search-modal').modal('show');
+            } else {
+				if (inputFocused) return;
+				searchInput.focus();
+				inputFocused = true;
+				searchShortcutKey.parentElement.classList.add('opacity-0');
+				if (!onlySpaces(searchInput.value)) {
+					addClassToNavbarSearch('done-searching');
+					searchResultsVisible = true;
+				}
+			}
+		}
+		if (e.key === 'Escape') {
+			if (!inputFocused) return;
+			searchInput.blur();
+			inputFocused = false;
+			removeClassFromNavbarSearch('done-searching');
+			searchResultsVisible = false;
+			searchShortcutKey.parentElement.classList.remove('opacity-0');
+		}
+	});
+
+	searchInput.addEventListener('blur', () => {
+		inputFocused = false;
+	});
+
+	document.addEventListener('click', ev => {
+		const { target } = ev;
+		const clickedOutside = !searchInput?.contains(target);
+		if (clickedOutside) {
+			removeClassFromNavbarSearch('is-searching');
+			removeClassFromNavbarSearch('done-searching');
+			searchResultsVisible = false;
+			searchShortcutKey.parentElement.classList.remove('opacity-0');
+		}
+	});
+
+	function handleScroll() {
+		const $el = $(this);
+		const reachedBottom = (this.scrollHeight - $el.scrollTop() - $el.outerHeight()) < 1;
+		if (reachedBottom) {
+			clearTimeout(timer);
+			timer = setTimeout(() => {
+				searchFunction(null, currentTab);
+				searchInput.blur();
+			}, 1000);
+		}
+	}
+});
+
+function onlySpaces(str) {
+	"use strict";
+	return str.trim().length === 0 || str === '';
+}
+
+function resetSearch() {
+	"use strict";
+	return searchFunction('delete');
+}
+
+const isDifferentSearch = (input) => {
+	return input.value !== lastSearchTerms[currentTab];
+};
+const shouldClearSearch = (n) => n === 'delete';
+
+let tabsContent = {};
+
+function changeTab(newTab) {
+	console.log('[changeTab] Changing from', currentTab, 'to', newTab);
+	// remove active and show classes from previous tab
+	document.querySelector(`#${currentTab}-tab`).classList.remove('active');
+	document.querySelector(`#${currentTab}-tab-content`).classList.remove('active');
+	document.querySelector(`#${currentTab}-tab-content`).classList.remove('show');
+
+	currentTab = newTab;
+
+	// add active and show classes for new tab
+	document.querySelector(`#${currentTab}-tab`).classList.add('active');
+	document.querySelector(`#${currentTab}-tab-content`).classList.add('active');
+	document.querySelector(`#${currentTab}-tab-content`).classList.add('show');
+}
+
+function showTabContent(tab) {
+	currentPage[tab] = 1;
+	noMorePagesAvailable[tab] = false;
+	const searchInput = document.querySelector('#modal-search-input');
+	if (!tabsContent[tab] || isDifferentSearch(searchInput)) {
+		if (!tabsContent[tab] && tab == 'recents' && onlySpaces(searchInput.value)) {
+			noMorePagesAvailable[tab] = true;
+		} else {
+			searchFunction(null, tab);
+		}
+	} else {
+		displayTabContent(tab);
+		currentPage[tab]++;
+	}
+}
+
+function displayTabContent(tab) {
+	const tabContent = document.querySelector(`#${tab}`);
+	if (tabContent && tabsContent[tab]) {
+		tabContent.innerHTML = tabsContent[tab];
+		adjustSearchResultsScroll();
+		adjustAvatarsTooltips(tab);
+	}
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.querySelector('#modal-search-input');
+    const tabButtons = document.querySelectorAll('#search-modal .search-tabs .nav-link');
+    tabButtons.forEach(button => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+			if (searchInput) {
+				searchInput.focus();
+			}
+
+            const newTab = button.id.replace('-tab', '');
+            if (newTab !== currentTab) {
+				changeTab(newTab);
+                showTabContent(newTab);
+            }
+        });
+    });
+});
+
+function adjustAvatarsTooltips(tab) {
+	const templatesLi = document.querySelectorAll(`#search-results-container #${tab} li`);
+	const lastTooltip = Array.from(document.querySelectorAll(`#search-results-container #${tab} li .avatar .text-capitalize`)).at(-1);
+	if (templatesLi) {
+		templatesLi.forEach(itemList => {
+			const avatar = itemList.querySelector('.avatar');
+			const tooltip = itemList.querySelector('.avatar .text-capitalize');
+
+			if (tooltip) {
+				avatar.addEventListener('mouseover', (event) => {
+					event.preventDefault();
+            		event.stopPropagation();
+					if (tooltip == lastTooltip) {
+						tooltip.classList.add('bottom-10');
+					} else {
+						tooltip.classList.add('top-10');
+					}
+					tooltip.classList.remove('hidden');
+				});
+				avatar.addEventListener('mouseout', (event) => {
+					event.preventDefault();
+            		event.stopPropagation();
+					tooltip.classList.add('hidden');
+					if (tooltip == lastTooltip) {
+						tooltip.classList.remove('bottom-10');
+					} else {
+						tooltip.classList.remove('top-10');
+					}
+				});
+			}
+		});
+	}
+}
+
+function goToRecentsTab() {
+	const recentsTab = document.getElementById('recents-tab');
+	recentsTab.click();
+}
+
+const searchModal = document.getElementById('search-modal');
+if (searchModal) {
+	searchModal.addEventListener('hidden.bs.modal', function() {
+		tabsContent = {};
+		currentPage = {
+			recents: 1,
+			templates: 1,
+			workspaces: 1,
+			myais: 1,
+			adminlinks: 1
+		};
+		noMorePagesAvailable = {
+			recents: false,
+			templates: false,
+			workspaces: false,
+			myais: false,
+			adminlinks: false
+		};
+		lastSearchTerms = {
+			recents: '',
+			templates: '',
+			workspaces: '',
+			myais: '',
+			adminlinks: ''
+		};
+		changeTab('recents');
+		justOpenedModal = true;
+	});
+}
+
+function adjustSearchResultsScroll() {
+	const searchResults = document.getElementById('search-results');
+	if (searchResults.scrollHeight >= 663) {
+		searchResults.classList.remove('overflow-y-hidden');
+		searchResults.classList.add('overflow-y-auto');
+	} else {
+		searchResults.classList.remove('overflow-y-auto');
+		searchResults.classList.add('overflow-y-hidden');
+	}
+}
+
+function storeRecentItem(itemId, searchResultType) {
+	const itemData = new FormData();
+	itemData.append('item_id', itemId);
+	itemData.append('search_result_type', searchResultType);
+
+	$.ajax({
+		type: "POST",
+		url: `/dashboard/api/store-recent-search-visit`,
+		data: itemData,
+		contentType: false,
+		processData: false,
+		success: function (result) {
+			console.log(result.message);
+		},
+		error: function () {
+			console.error('Error storing recent search visit', error);
+		}
+	});
+}
+
+function removeRecentItem(event, itemId, searchResultType) {
+    const liToRemove = event.target.closest('li');
+    if (liToRemove) {
+        liToRemove.classList.add('hidden');
+		tabsContent['recents'] = document.querySelector('#recents').innerHTML;
+    }
+
+	const itemData = new FormData();
+	itemData.append('item_id', itemId);
+	itemData.append('search_result_type', searchResultType);
+
+	$.ajax({
+		type: "POST",
+		url: `/dashboard/api/remove-recent-search-visit`,
+		data: itemData,
+		contentType: false,
+		processData: false,
+		success: function () {
+			console.log('Removed recent visited item succesfully!');
+			currentPage['recents'] = 1;
+			noMorePagesAvailable['recents'] = false;
+			searchFunction(null, 'recents');
+		},
+		error: function () {
+			console.error('Failed to remove recent search visit item', error);
+		}
+	});
+}
+
+function searchFunction(n, tab = currentTab) {
+	const navbarSearch = document.querySelector('#navbar-search');
+	const searchInput = document.querySelector('#modal-search-input');
+
+	const addClassToNavbarSearch = (className) => {
+		if (navbarSearch) {
+			navbarSearch.classList.add(className);
+		}
+	};
+
+	const removeClassFromNavbarSearch = (className) => {
+		if (navbarSearch) {
+			navbarSearch.classList.remove(className);
+		}
+	};
+
+	if (isDifferentSearch(searchInput)) {
+		currentPage[tab] = 1;
+		noMorePagesAvailable[tab] = false;
+	}
+
+	if (noMorePagesAvailable[tab]) {
+		removeClassFromNavbarSearch('is-searching');
+		return;
+	}
+
+	addClassToNavbarSearch('is-searching');
+
+	const formData = new FormData();
+	formData.append('_token', document.querySelector("input[name=_token]")?.value);
+	formData.append('search', shouldClearSearch(n) ? n : searchInput.value);
+
+	$.ajax({
+		type: "POST",
+		url: `/dashboard/api/search-${tab}?page=${currentPage[tab]}`,
+		data: formData,
+		contentType: false,
+		processData: false,
+		success: function (result) {
+			renderByUseCase(result?.htmlUseCase, result.html, tab);
+			addClassToNavbarSearch('done-searching');
+			removeClassFromNavbarSearch('is-searching');
+
+			searchResultsVisible = true;
+			currentPage[tab]++;
+			lastSearchTerms[tab] = searchInput.value;
+		},
+		error: function () {
+			addClassToNavbarSearch('done-searching');
+			removeClassFromNavbarSearch('is-searching');
+		}
+	});
+
+	function renderByUseCase(useCase, html, tab) {
+		const placeToInsert = $(`#${tab}`);
+		if (useCase === 'NO_TEMPLATES_FOUND' || useCase === 'NO_ADMIN_LINKS_FOUND') {
+			if (justOpenedModal && (tab == 'recents')) {
+				clearTimeout(timer);
+				timer = setTimeout(() => {
+					goToTemplatesTab();
+				}, 1000);
+			}
+			const isInfinityScroll = currentPage[tab] !== 1;
+			if (isInfinityScroll) {
+				noMorePagesAvailable[tab] = true;
+			} else {
+				if (tab == 'recents') {
+					noMorePagesAvailable[tab] = true;
+				} else {
+					placeToInsert.html(html);
+					tabsContent[tab] = html;
+				}
+			}
+		}
+
+		if (useCase === "LIST_OF_TEMPLATES" || useCase === "LIST_OF_ADMIN_LINKS") {
+			const isFirstPage = currentPage[tab] === 1;
+			if (isFirstPage) {
+				placeToInsert.html(html);
+				tabsContent[tab] = html;
+				adjustSearchResultsScroll();
+			} else {
+				placeToInsert.append(html);
+			}
+		}
+		justOpenedModal = false;
+
+		adjustAvatarsTooltips(tab);
+	}
+
+	function goToTemplatesTab() {
+		const templatesTab = document.getElementById('templates-tab');
+		templatesTab.click();
+	}
+}
+
+function handleAdminLinkClick(event, url) {
+	event.preventDefault();
+	event.stopPropagation();
+	
+	const isModifierKey = event.metaKey || event.ctrlKey || event.button === 1;
+	
+	if (isModifierKey) {
+		window.open(url, '_blank');
+	} else {
+		$('#search-modal').modal('hide');
+		window.location.href = url;
+	}
+}

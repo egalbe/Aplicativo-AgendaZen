@@ -1,0 +1,125 @@
+/**
+ * Shared Tooltip Logic - SINGLE SOURCE OF TRUTH
+ * This function is used by BOTH the component AND dynamic initialization
+ */
+window.initializeTooltip = function(tooltipId, options = {}) {
+    if (!tooltipId || typeof tooltipId !== 'string') return;
+    
+    const {
+        closeTimeout = 500,
+        showIcon = true,
+        aboveIcon = false,
+        _skipDuplicateCheck = false
+    } = options;
+
+    let tooltipTrigger = document.querySelector(`#${tooltipId}-container`);
+    const tooltipTemplate = document.querySelector(`#${tooltipId}-template`);
+    let tooltipContent = document.querySelector(`#${tooltipId}`);
+
+    if (!showIcon) {
+        tooltipTrigger = document.querySelector(`#${tooltipId}-container .tooltip-trigger`);
+    }
+
+    if (!tooltipTrigger || !tooltipTemplate) return;
+    
+    if (!_skipDuplicateCheck) {
+        const container = document.querySelector(`#${tooltipId}-container`);
+        if (container && container.hasAttribute('data-tooltip-initialized')) return;
+        if (container) container.setAttribute('data-tooltip-initialized', 'true');
+    }
+
+    let timeout;
+
+    tooltipTrigger.addEventListener('mouseenter', () => {
+        clearTimeout(timeout);
+
+        if (!tooltipContent) {
+            tooltipContent = tooltipTemplate.content.cloneNode(true).firstElementChild;
+            tooltipContent.setAttribute('id', tooltipId);
+            tooltipContent.style.position = 'absolute';
+            tooltipContent.style.visibility = 'hidden';
+            tooltipContent.style.opacity = '0';
+            document.body.appendChild(tooltipContent);
+        }
+
+        const triggerRect = tooltipTrigger.getBoundingClientRect();
+        const tooltipRect = tooltipContent.getBoundingClientRect();
+
+        const spacing = 8;
+        let top, left;
+
+        if (aboveIcon) {
+            top = window.scrollY + triggerRect.top - tooltipRect.height - spacing;
+        } else {
+            top = window.scrollY + triggerRect.bottom + spacing;
+        }
+
+        left = window.scrollX + triggerRect.left + (triggerRect.width / 2) - (tooltipRect.width / 2);
+        left = Math.max(spacing, Math.min(left, window.innerWidth - tooltipRect.width - spacing));
+
+        tooltipContent.style.height = `${tooltipRect.height}px`;
+        tooltipContent.style.visibility = 'visible';
+        tooltipContent.style.opacity = '1';
+        tooltipContent.style.transform = 'translateY(0)';
+        tooltipContent.style.pointerEvents = 'auto';
+        tooltipContent.style.top = `${top}px`;
+        tooltipContent.style.left = `${left}px`;
+    });
+
+    tooltipTrigger.addEventListener('mouseleave', () => {
+        timeout = setTimeout(() => {
+            if (tooltipContent && tooltipContent.parentNode) {
+                document.body.removeChild(tooltipContent);
+                tooltipContent = null;
+            }
+        }, closeTimeout);
+    });
+
+    const checkTooltipContent = () => {
+        const currentTooltipContent = document.querySelector(`#${tooltipId}`);
+        if (currentTooltipContent) {
+            currentTooltipContent.addEventListener('mouseenter', () => {
+                clearTimeout(timeout);
+            });
+
+            currentTooltipContent.addEventListener('mouseleave', () => {
+                timeout = setTimeout(() => {
+                    if (currentTooltipContent && currentTooltipContent.parentNode) {
+                        document.body.removeChild(currentTooltipContent);
+                        tooltipContent = null;
+                    }
+                }, closeTimeout);
+            });
+        }
+    };
+
+    checkTooltipContent();
+    setTimeout(checkTooltipContent, 100);
+};
+
+/**
+ * Dynamic Tooltip Initializer for AJAX Content
+ * Reuses the SAME logic as the component
+ */
+window.initializeDynamicTooltips = function() {
+    const containers = document.querySelectorAll('.tooltip-container:not([data-tooltip-initialized])');
+
+    containers.forEach(container => {
+        container.setAttribute('data-tooltip-initialized', 'true');
+        if (!container.id) return;
+        
+        const tooltipId = container.id.replace('-container', '');
+        const template = container.querySelector(`#${tooltipId}-template`);
+
+        if (!template) return;
+
+        const options = {
+            closeTimeout: 500,
+            showIcon: !container.querySelector('.tooltip-trigger'),
+            aboveIcon: false,
+            _skipDuplicateCheck: true 
+        };
+
+        window.initializeTooltip(tooltipId, options);
+    });
+}; 

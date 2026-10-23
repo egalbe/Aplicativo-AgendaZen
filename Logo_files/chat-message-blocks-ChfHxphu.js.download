@@ -1,0 +1,23 @@
+var e=(e,t={})=>{let n=window.trans||window.tessChatConfig?.trans;if(typeof n==`function`)return n(e,t);let r=e;for(let[e,n]of Object.entries(t))r=r.replace(`:${e}`,n);return r};function t(e,t,n={},r=null){let i=window.getChatGroupContainer,a=r||(typeof i==`function`?i():null);if(!a)return;let o=a.querySelector(`.chat-messages`);if(!o||o.querySelector(`[data-message-id="${t}"]`))return;let s=document.querySelector(`#chat-assistant-message-template`);if(!s)return;let c=s.content.children[0].cloneNode(!0);c.classList.add(`chat-message-enter`);let l=c.querySelector(`.chat-assistant-title`);l.innerHTML=n?.external_agent_title??``,l.classList.add(`hidden`),c.setAttribute(`data-message-id`,t),c.setAttribute(`data-tools-mode`,n?.is_agent?`agent`:n?.tools_mode||``);let u=window.collectMessageFiles;typeof u==`function`?c.setAttribute(`data-workspace-files`,JSON.stringify(u(n))):c.setAttribute(`data-workspace-files`,JSON.stringify([]));let d=c.querySelector(`.user-avatar-template-header img`);if(d){let e=null;if(n?.external_agent_avatar_thumbnail)e=n.external_agent_avatar_thumbnail;else if(n?.external_agent_title)e=typeof window.getDefaultImage==`function`?window.getDefaultImage():null;else{try{let t=window.getExternalOpenai;if(typeof t==`function`){let n=t();n&&n.title&&(c.querySelector(`.chat-assistant-title`).innerHTML=n.title,e=n.avatar_thumbnail||(typeof window.getDefaultImage==`function`?window.getDefaultImage():null))}}catch{}e||(typeof window.getCurrentAgentAvatar==`function`?e=window.getCurrentAgentAvatar():typeof window.getDefaultImage==`function`&&(e=window.getDefaultImage()))}e&&(d.src=e)}let f=c.querySelector(`.chat-content`);f&&(f.innerHTML=``),typeof window.appendChatMessageElement==`function`&&window.appendChatMessageElement(o,c),o.dataset.loaded=!0}function n(t){let n=window.getChatGroupContainer,r=typeof n==`function`?n():null,i=window.tessChatConfig?.openai?.title||``,a=document.querySelector(`#chat-assistant-message-template`);if(!a)return;let o=a.content.children[0].cloneNode(!0);o.querySelector(`.chat-assistant-title`).innerHTML=i;let s=o.querySelector(`.chat-content`);if(!s)return;s.classList.add(`error-message`);let c=window.tessChatConfig?.providerErrorsLearnMoreLink||``,l=document.createElement(`div`);if(l.textContent=t??``,s.innerHTML=`
+        <div class="flex items-center justify-between error-message-container">
+            <span>
+                ${l.innerHTML} 
+                <a href="#" class="inline-flex items-center underline text-sm font-medium" onclick="event.preventDefault(); var m = this.closest('.chat-assistant-message'); if (m && typeof handleRetryMessage === 'function') { handleRetryMessage(parseInt(m.getAttribute('data-message-id'), 10)); }">
+                    ${e(`Click to retry`)}
+                    <span class="ml-1 flex items-center">
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.19" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                    </span>
+                </a>
+            </span>
+            ${c?`
+                <a href="${c}" target="_blank" class="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-500 whitespace-nowrap ml-4">
+                    ${e(`Learn more`)}
+                    <svg class="ml-1 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                </a>
+            `:``}
+        </div>
+    `,r){let e=r.querySelector(`.chat-messages`);e&&typeof window.appendChatMessageElement==`function`&&window.appendChatMessageElement(e,o)}}if(typeof window<`u`)try{window.createChatMessageBlock=t,window.createFailedEmbeddedChatMessageBlock=n}catch{}

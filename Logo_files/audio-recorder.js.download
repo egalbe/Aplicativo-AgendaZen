@@ -1,0 +1,1578 @@
+if (typeof __ !== 'function') {
+    window.__ = function(text, params) {
+        if (!params) return text;
+        return text.replace(/{([^}]+)}/g, function(match, key) {
+            return typeof params[key] !== 'undefined' ? params[key] : match;
+        });
+    };
+}
+
+class AudioRecorder {
+    constructor() {
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.audioBlob = null;
+        this.audioUrl = null;
+        this.audioElement = null;
+        this.stream = null;
+        this.isRecording = false;
+        this.isPaused = false;
+        this.startTime = null;
+        this.elapsedTime = 0;
+        this.pausedTime = 0;
+        this.timerInterval = null;
+        this.visualizerInterval = null;
+        this.analyser = null;
+        this.dataArray = null;
+        this.canvasCtx = null;
+        this.savedTextareaContent = ''; 
+        
+        this.supportsPauseResume = false;
+        this.pauseWorkaround = false;
+        this.tempChunks = [];
+        
+        const configMaxTime = (window.AUDIO_RECORDER_CONFIG && window.AUDIO_RECORDER_CONFIG.maxRecordingTime) || 300;
+        this.maxRecordingTime = configMaxTime;
+        this.remainingTime = configMaxTime;
+    }
+
+    async startRecording() {
+        try {
+            this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            const hasMediaRecorderPauseSupport = typeof MediaRecorder !== 'undefined' && 
+                                               typeof MediaRecorder.prototype.pause === 'function' && 
+                                               typeof MediaRecorder.prototype.resume === 'function';
+            
+            this.supportsPauseResume = hasMediaRecorderPauseSupport;
+            
+            this.pauseWorkaround = !hasMediaRecorderPauseSupport;
+            
+            let options = {};
+            if (MediaRecorder.isTypeSupported('audio/mp3')) {
+                options = { mimeType: 'audio/mp3' };
+            } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/webm' };
+            }
+            this.mediaRecorder = new MediaRecorder(this.stream, options);
+            this.audioChunks = [];
+
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(this.stream);
+            this.analyser = audioContext.createAnalyser();
+            this.analyser.fftSize = 256;
+            source.connect(this.analyser);
+            const bufferLength = this.analyser.frequencyBinCount;
+            this.dataArray = new Uint8Array(bufferLength);
+
+            const canvas = document.getElementById('audio-visualizer');
+            if (canvas) {
+                this.canvasCtx = canvas.getContext('2d');
+            }
+
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.audioChunks.push(event.data);
+                }
+            };
+
+            this.mediaRecorder.onstop = () => {
+                const mimeType = this.mediaRecorder.mimeType || 'audio/webm';
+                this.audioBlob = new Blob(this.audioChunks, { type: mimeType });
+                this.audioUrl = URL.createObjectURL(this.audioBlob);
+            };
+
+            this.mediaRecorder.start(200);
+            this.isRecording = true;
+            this.isPaused = false;
+            this.startTime = new Date();
+            this.elapsedTime = 0;
+            this.pausedTime = 0;
+            this.remainingTime = this.maxRecordingTime;
+
+            this.startTimer();
+            
+            this.startVisualizer();
+            
+            const recordingInterface = document.querySelector('.audio-recording-interface');
+            if (recordingInterface) {
+                recordingInterface.classList.add('is-recording');
+            }
+            // Recording controls are mounted inline inside the
+            // .extra-fields-container toolbar, so we must NOT hide that
+            // container here — doing so would also hide the recording UI.
+
+            return true;
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            if (typeof toastr !== 'undefined') {
+                const micPermissionMsg = __('Could not access the microphone. Check your browser permissions.');
+                toastr.error(micPermissionMsg);
+            } else {
+                const micPermissionMsg = __('Could not access the microphone. Check your browser permissions.');
+                alert(micPermissionMsg);
+            }
+            return false;
+        }
+    }
+
+    pauseRecording() {
+        if (this.isRecording && !this.isPaused && this.mediaRecorder) {
+            try {
+                if (this.supportsPauseResume) {
+                    this.mediaRecorder.pause();
+                } else if (this.pauseWorkaround) {
+                    this.tempChunks = [...this.audioChunks];
+                    this.stream.getAudioTracks().forEach(track => {
+                        track.enabled = false;
+                    });
+                }
+                
+                this.isPaused = true;
+                
+                this.stopVisualizer();
+                
+                const recordingInterface = document.querySelector('.audio-recording-interface');
+                if (recordingInterface) {
+                    recordingInterface.classList.remove('is-recording');
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Error pausing recording:', error);
+                return false;
+            }
+        }
+        return false;
+    }
+
+    resumeRecording() {
+        if (this.isRecording && this.isPaused && this.mediaRecorder) {
+            try {
+                if (this.supportsPauseResume) {
+                    this.mediaRecorder.resume();
+                } else if (this.pauseWorkaround) {
+                    this.stream.getAudioTracks().forEach(track => {
+                        track.enabled = true;
+                    });
+                }
+                
+                this.isPaused = false;
+                
+                this.startVisualizer();
+                
+                const recordingInterface = document.querySelector('.audio-recording-interface');
+                if (recordingInterface) {
+                    recordingInterface.classList.add('is-recording');
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Error resuming recording:', error);
+                return false;
+            }
+        }
+        return false;
+    }
+
+    stopRecording() {
+        if (this.isRecording && this.mediaRecorder) {
+            try {
+                if (this.isPaused && this.pauseWorkaround) {
+                    this.stream.getAudioTracks().forEach(track => {
+                        track.enabled = true;
+                    });
+                }
+                
+                this.mediaRecorder.stop();
+                this.isRecording = false;
+                this.isPaused = false;
+                
+                clearInterval(this.timerInterval);
+                
+                this.stopVisualizer();
+                
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                const recordingInterface = document.querySelector('.audio-recording-interface');
+                if (recordingInterface) {
+                    recordingInterface.classList.remove('is-recording');
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Error stopping recording:', error);
+                
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                this.isRecording = false;
+                this.isPaused = false;
+                return false;
+            }
+        }
+        return false;
+    }
+
+    cancelRecording() {
+        this.stopRecording();
+        
+        this.audioChunks = [];
+        this.audioBlob = null;
+        this.audioUrl = null;
+        this.savedTextareaContent = ''; 
+        
+        return true;
+    }
+
+    getAudioBlob() {
+        return this.audioBlob;
+    }
+
+    startTimer() {
+        clearInterval(this.timerInterval);
+        this.updateTimerDisplay();
+        this.timerInterval = setInterval(() => {
+            this.updateTimerDisplay();
+        }, 1000);
+    }
+
+    updateTimerDisplay() {
+        if (!this.isPaused && this.isRecording) {
+            this.remainingTime = Math.max(0, this.remainingTime - 1);
+        }
+
+        const hours = Math.floor(this.remainingTime / 3600);
+        const minutes = Math.floor((this.remainingTime % 3600) / 60);
+        const seconds = this.remainingTime % 60;
+        
+        let formattedTime;
+        if (hours > 0) {
+            formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        } else {
+            formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+        
+        const timerElement = document.getElementById('recording-timer');
+        if (timerElement) {
+            timerElement.textContent = formattedTime;
+        }
+        
+        const totalRecordedTime = this.maxRecordingTime - this.remainingTime;
+        const canSend = totalRecordedTime >= 5;
+        if (this._lastCanSend !== canSend) {
+            this._lastCanSend = canSend;
+            try {
+                window.dispatchEvent(new CustomEvent('tess:audio-recorder:can-send', {
+                    detail: { canSend: canSend }
+                }));
+            } catch (e) {}
+        }
+        const sendButton = document.getElementById('send-recording');
+        if (sendButton) {
+            if (canSend) {
+                sendButton.disabled = false;
+                sendButton.title = __('Send recording');
+            } else {
+                sendButton.disabled = true;
+                const secondsLeft = 5 - totalRecordedTime;
+                sendButton.title = __('Recording too short (minimum 5 seconds). {seconds} second(s) left.', { seconds: secondsLeft });
+            }
+        }
+        
+        if (!this.isPaused && this.isRecording && this.remainingTime <= 0) {
+            this.remainingTime = 0;
+            clearInterval(this.timerInterval);
+            setTimeout(() => {
+                this.autoSendRecording();
+            }, 100);
+        }
+    }
+    
+    autoSendRecording() {
+        if (!this.isRecording) {
+            return;
+        }
+        
+        const sendButton = document.getElementById('send-recording');
+        if (sendButton && !sendButton.disabled) {
+            sendButton.click();
+        } else {
+            this.stopRecording();
+            hideRecordingInterface();
+            const minutes = Math.floor(this.maxRecordingTime / 60);
+            const seconds = this.maxRecordingTime % 60;
+            const timeLimit = minutes > 0 ? `${minutes} minute(s)` : `${seconds} second(s)`;
+            showToast(__('Recording time limit reached ({time})', { time: timeLimit }), 'info');
+        }
+    }
+
+    startVisualizer() {
+        this._visualizerActive = true;
+        const animate = () => {
+            if (!this._visualizerActive) return;
+            this.drawVisualizer();
+            this._visualizerFrame = requestAnimationFrame(animate);
+        };
+        if (this._visualizerFrame) {
+            cancelAnimationFrame(this._visualizerFrame);
+        }
+        animate();
+    }
+
+    stopVisualizer() {
+        this._visualizerActive = false;
+        if (this._visualizerFrame) {
+            cancelAnimationFrame(this._visualizerFrame);
+            this._visualizerFrame = null;
+        }
+    }
+
+    drawVisualizer() {
+        if (!this.analyser || !this.canvasCtx || !this.dataArray) return;
+
+        const ctx = this.canvasCtx;
+        const width = ctx.canvas.width;
+        const height = ctx.canvas.height;
+
+        // Compact "voice waves" bubble for the inline composer (≤ ~64px).
+        if (width <= 64) {
+            this._drawCompactVoiceWaves(ctx, width, height);
+            return;
+        }
+
+        ctx.save();
+        const radius = height / 2;
+        ctx.beginPath();
+        ctx.moveTo(radius, 0);
+        ctx.lineTo(width - radius, 0);
+        ctx.quadraticCurveTo(width, 0, width, radius);
+        ctx.lineTo(width, height - radius);
+        ctx.quadraticCurveTo(width, height, width - radius, height);
+        ctx.lineTo(radius, height);
+        ctx.quadraticCurveTo(0, height, 0, height - radius);
+        ctx.lineTo(0, radius);
+        ctx.quadraticCurveTo(0, 0, radius, 0);
+        ctx.closePath();
+        ctx.clip();
+
+        ctx.clearRect(0, 0, width, height);
+
+        const numBars = 160;
+        const numDots = 16;
+        const barWidth = width / numBars;
+        const maxBarHeight = height * 0.9;
+        this.analyser.getByteFrequencyData(this.dataArray);
+        
+        const isDarkMode = document.documentElement.classList.contains('dark') || 
+                          document.documentElement.classList.contains('theme-dark') ||
+                          document.body.classList.contains('dark') ||
+                          document.body.classList.contains('theme-dark');
+        
+        const gradient = ctx.createLinearGradient(0, 0, width, 0);
+        if (isDarkMode) {
+            gradient.addColorStop(0, '#8667cf');
+            gradient.addColorStop(0.5, '#F5C5FF');
+            gradient.addColorStop(1, '#6146a1');
+        } else {
+            gradient.addColorStop(0, '#765CBD');
+            gradient.addColorStop(0.5, '#3F2D6F');
+            gradient.addColorStop(1, '#321A6C');
+        }
+
+        const centerBar = Math.floor(numBars / 2);
+        const now = Date.now() / 350;
+        const propagationSpeed = 0.06;
+        const amplitudeBoost = 1.5;
+        
+        for (let i = 0; i < numBars; i++) {
+            let distanceFromCenter = Math.abs(i - centerBar);
+            const propagationDelay = distanceFromCenter * propagationSpeed;
+            const phase = now - propagationDelay;
+            const wave = Math.abs(Math.sin(phase));
+            const dataIdx = Math.floor(distanceFromCenter * (this.dataArray.length / centerBar));
+            let amplitude = this.dataArray[dataIdx] / 255;
+            amplitude *= wave * amplitudeBoost;
+            amplitude = Math.min(amplitude, 1);
+            const barHeight = amplitude * maxBarHeight;
+            const dotSpacing = barHeight / numDots;
+            for (let j = 0; j < numDots; j++) {
+                if ((j + 1) * dotSpacing > barHeight) break;
+                const y = height - (j + 1) * dotSpacing - 4;
+                if (y < 0) continue;
+                ctx.beginPath();
+                ctx.arc(i * barWidth + barWidth / 2, y, barWidth * 0.08, 0, 2 * Math.PI);
+                ctx.fillStyle = gradient;
+                ctx.globalAlpha = isDarkMode ? 
+                    (0.9 - (j / numDots) * 0.3) : 
+                    (0.8 - (j / numDots) * 0.5);
+                ctx.fill();
+            }
+        }
+        ctx.globalAlpha = 1.0;
+        ctx.restore();
+    }
+
+    /** Compact 5-bar "voice waves" visualizer for the inline recorder bubble. */
+    _drawCompactVoiceWaves(ctx, width, height) {
+        ctx.clearRect(0, 0, width, height);
+        this.analyser.getByteFrequencyData(this.dataArray);
+
+        const isDarkMode = document.documentElement.classList.contains('theme-dark') ||
+            document.body.classList.contains('theme-dark');
+        const baseColor = isDarkMode ? '#E5E5EA' : '#1F1F26';
+
+        const numBars = 5;
+        const barGap = 2;
+        const barRadius = 1.5;
+        const totalGap = barGap * (numBars - 1);
+        const barWidth = Math.max(2, Math.floor((width * 0.7 - totalGap) / numBars));
+        const totalWidth = numBars * barWidth + totalGap;
+        const startX = Math.round((width - totalWidth) / 2);
+        const minHeight = Math.max(3, Math.floor(height * 0.18));
+        const maxHeight = Math.floor(height * 0.78);
+
+        // Sample 5 frequency bands (low → high) for a balanced waveform.
+        const bands = [];
+        const dataLen = this.dataArray.length;
+        const usableLen = Math.floor(dataLen * 0.6);
+        for (let b = 0; b < numBars; b++) {
+            const startIdx = Math.floor((b / numBars) * usableLen);
+            const endIdx = Math.floor(((b + 1) / numBars) * usableLen);
+            let sum = 0;
+            for (let i = startIdx; i < endIdx; i++) sum += this.dataArray[i] || 0;
+            const avg = sum / Math.max(1, endIdx - startIdx);
+            bands.push(avg / 255);
+        }
+
+        // Smooth values frame-to-frame (avoids jittery/flat look at low input).
+        if (!this._compactBandsSmoothed) this._compactBandsSmoothed = bands.slice();
+        for (let i = 0; i < numBars; i++) {
+            const target = bands[i];
+            const prev = this._compactBandsSmoothed[i] || 0;
+            this._compactBandsSmoothed[i] = prev + (target - prev) * 0.35;
+        }
+
+        ctx.fillStyle = baseColor;
+        for (let b = 0; b < numBars; b++) {
+            const amp = this._compactBandsSmoothed[b];
+            const barH = Math.max(minHeight, Math.min(maxHeight, minHeight + amp * (maxHeight - minHeight) * 1.6));
+            const x = startX + b * (barWidth + barGap);
+            const y = Math.round((height - barH) / 2);
+            // Rounded rect (fallback for older browsers).
+            if (typeof ctx.roundRect === 'function') {
+                ctx.beginPath();
+                ctx.roundRect(x, y, barWidth, barH, barRadius);
+                ctx.fill();
+            } else {
+                ctx.fillRect(x, y, barWidth, barH);
+            }
+        }
+    }
+}
+
+let audioRecorder = null;
+
+function findTextareaContainer() {
+    const activeChats = document.querySelectorAll('.chat-group-container[style*="display: block"], .chat-group-container:not([style*="display: none"])');
+    
+    for (const chatContainer of activeChats) {
+        const textareaContainer = chatContainer.querySelector('#textarea-container .flex.w-full') || 
+                                 chatContainer.querySelector('#textarea-container div.flex'); 
+        
+        if (textareaContainer) {
+            return textareaContainer;
+        }
+    }
+    
+    const newChatContainer = document.querySelector('form#openai_generator_form #textarea-container .flex.w-full') ||
+                             document.querySelector('form#openai_generator_form #textarea-container div.flex');
+    
+    if (newChatContainer) {
+        return newChatContainer;
+    }
+    
+    const textarea = document.querySelector('#chat-textarea-input, #chat_input_textarea, .auto-resize-textarea');
+    if (textarea) {
+        const parentContainer = textarea.closest('div.flex');
+        if (parentContainer) {
+            return parentContainer;
+        }
+    }
+    
+    return null;
+}
+
+function findChatTextareaForRecording() {
+    const selectors = [
+        '#chat-textarea-input',
+        '#chat_input_textarea',
+        '.auto-resize-textarea',
+        '[name="chat_input"]'
+    ];
+    const activeChat = document.querySelector('.chat-group-container[style*="display: block"], .chat-group-container:not([style*="display: none"])');
+    if (activeChat) {
+        for (const selector of selectors) {
+            const ta = activeChat.querySelector(selector);
+            if (ta) return ta;
+        }
+    }
+    for (const selector of selectors) {
+        const ta = document.querySelector(selector);
+        if (ta) return ta;
+    }
+    return null;
+}
+
+function syncAudioRecordingSendMirror() {
+    const textarea = findChatTextareaForRecording();
+    if (!textarea) return;
+    const shell = textarea.closest('.chat-input-shell') || document;
+    const submitBtn = shell.querySelector('.template_send_message_button');
+    const micBtn = shell.querySelector('#audio-recording-container .audio-recording-toggler');
+    if (!submitBtn || !micBtn) return;
+    const isDisabled = !!submitBtn.disabled;
+    micBtn.classList.add('is-send-mirror');
+    micBtn.disabled = isDisabled;
+    micBtn.classList.toggle('cursor-not-allowed', isDisabled);
+    micBtn.classList.remove('opacity-50');
+    micBtn.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
+    micBtn.setAttribute('aria-label', isDisabled ? __('Type a message to send') : __('Send message'));
+    micBtn.setAttribute('title', isDisabled ? __('Type a message to send') : __('Send message'));
+
+    const audioContainerEl = micBtn.closest('#audio-recording-container');
+    if (audioContainerEl) {
+        // Avoid duplicated send actions: when the real submit button is enabled
+        // (textarea has content), keep only it visible.
+        if (isDisabled) {
+            audioContainerEl.classList.remove('hidden');
+            audioContainerEl.style.display = '';
+        } else {
+            audioContainerEl.classList.add('hidden');
+            audioContainerEl.style.display = 'none';
+        }
+    }
+}
+
+function handleRecordingSendMirrorClick(ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const micBtn = ev.target.closest('.audio-recording-toggler');
+    if (!micBtn || micBtn.disabled) return;
+    if (window.AudioRecorderUI && typeof window.AudioRecorderUI.send === 'function') {
+        window.AudioRecorderUI.send();
+    }
+}
+
+var __audioRecorderMirrorInterval = null;
+var __audioRecorderMirrorInputBound = null;
+
+function startAudioRecordingSendMirror() {
+    stopAudioRecordingSendMirror();
+    const textarea = findChatTextareaForRecording();
+    if (!textarea) return;
+    const shell = textarea.closest('.chat-input-shell') || document;
+    const micBtn = shell.querySelector('#audio-recording-container .audio-recording-toggler');
+    if (!micBtn) return;
+    micBtn.removeEventListener('click', showRecordingInterface);
+    micBtn.removeEventListener('click', handleRecordingSendMirrorClick);
+    micBtn.addEventListener('click', handleRecordingSendMirrorClick);
+
+    var onInput = function () {
+        syncAudioRecordingSendMirror();
+    };
+    textarea.addEventListener('input', onInput);
+    textarea.addEventListener('change', onInput);
+    __audioRecorderMirrorInputBound = { textarea: textarea, onInput: onInput };
+    __audioRecorderMirrorInterval = setInterval(syncAudioRecordingSendMirror, 400);
+    syncAudioRecordingSendMirror();
+}
+
+function stopAudioRecordingSendMirror() {
+    if (__audioRecorderMirrorInterval) {
+        clearInterval(__audioRecorderMirrorInterval);
+        __audioRecorderMirrorInterval = null;
+    }
+    if (__audioRecorderMirrorInputBound) {
+        __audioRecorderMirrorInputBound.textarea.removeEventListener('input', __audioRecorderMirrorInputBound.onInput);
+        __audioRecorderMirrorInputBound.textarea.removeEventListener('change', __audioRecorderMirrorInputBound.onInput);
+        __audioRecorderMirrorInputBound = null;
+    }
+    document.querySelectorAll('#audio-recording-container .audio-recording-toggler').forEach(function (micBtn) {
+        micBtn.removeEventListener('click', handleRecordingSendMirrorClick);
+        micBtn.classList.remove('is-send-mirror', 'cursor-not-allowed', 'opacity-50');
+        micBtn.disabled = false;
+        micBtn.setAttribute('aria-disabled', 'false');
+    });
+}
+
+/**
+ * Stop the active recording immediately while preserving the textarea content
+ * (typed/streamed transcription). Used when the user sends a TEXT message
+ * during a recording — recording must pause on the spot, no upload/transcribe.
+ */
+function stopRecordingKeepingText() {
+    try {
+        if (audioRecorder && audioRecorder.isRecording) {
+            audioRecorder.stopRecording();
+        }
+    } catch (e) {}
+    try {
+        if (typeof maybeCancelStreamingSession === 'function') {
+            maybeCancelStreamingSession('user_submit');
+        }
+    } catch (e) {}
+    window.__audioRecorderStreamState = null;
+    hideRecordingInterface();
+}
+
+function showRecordingInterface(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    if (document.querySelector('#audio-recording-container .audio-recording-toggler.is-loading')) {
+        return;
+    }
+
+    // Loading feedback ONLY on the actual mic toggler (inside
+    // #audio-recording-container), not on the visualizer that reuses the same
+    // base class for styling.
+    document.querySelectorAll('#audio-recording-container .audio-recording-toggler').forEach(btn => {
+        btn.classList.add('is-loading');
+        btn.setAttribute('aria-busy', 'true');
+    });
+
+    const textarea = findChatTextareaForRecording();
+    if (!textarea) {
+        showToast(__('Could not start recording. Please try again.'), 'error');
+        return;
+    }
+
+    if (!audioRecorder) {
+        audioRecorder = new AudioRecorder();
+    }
+    audioRecorder.savedTextareaContent = textarea.value || '';
+
+    // Streaming text writes directly into the chat textarea. We keep a baseline
+    // (whatever was there before recording started, plus a separator) and a
+    // tracker of the last suffix we appended, so we can replace it on every
+    // partial without losing the user's manual edits.
+    const baselineRaw = textarea.value || '';
+    const baseline = baselineRaw && !baselineRaw.endsWith(' ') ? baselineRaw + ' ' : baselineRaw;
+    window.__audioRecorderStreamState = {
+        textarea: textarea,
+        originalText: baselineRaw,
+        baseline: baseline,
+        lastSuffix: '',
+        lastWrittenValue: textarea.value || '',
+    };
+
+    // Remove any leftover host from a previous session.
+    document.querySelectorAll('.audio-recording-host').forEach(el => el.remove());
+
+    const activeContainer = textarea.closest('#textarea-container');
+    if (!activeContainer) {
+        showToast(__('Could not start recording. Please try again.'), 'error');
+        return;
+    }
+
+    // Locate the toolbar slot where the audio toggler + submit button normally
+    // live, so the recording controls inherit the same height/position.
+    const shell = activeContainer.closest('.chat-input-shell') || document;
+    const audioContainer = shell.querySelector('#audio-recording-container');
+    const submitContainer = shell.querySelector('#submit-button-container');
+    const toolbarGroup = audioContainer && audioContainer.parentElement
+        ? audioContainer.parentElement
+        : (submitContainer && submitContainer.parentElement
+            ? submitContainer.parentElement
+            : shell.querySelector('.chat-input-toolbar.extra-fields-container > div:last-child'));
+
+    activeContainer.classList.add('audio-recording-active');
+
+    const host = document.createElement('div');
+    host.className = 'audio-recording-host flex items-center justify-center h-8';
+
+    const reactMount = document.createElement('react-component');
+    reactMount.setAttribute('data-component', 'chat/ChatAudioRecorder');
+    reactMount.setAttribute('data-props', '{}');
+    host.appendChild(reactMount);
+
+    // Insert the recording controls between the model selector and the chat
+    // submit button so users keep the model picker AND can hit chat send while
+    // a recording is in progress.
+    if (submitContainer && submitContainer.parentElement) {
+        submitContainer.parentElement.insertBefore(host, submitContainer);
+    } else if (toolbarGroup) {
+        toolbarGroup.appendChild(host);
+    } else {
+        activeContainer.appendChild(host);
+    }
+
+    // Ensure dynamically inserted react-component gets mounted before we rely
+    // on the inline recorder controls.
+    try { reinitializeReactComponents(); } catch (e) {}
+
+    const ensureRecorderUiReady = (attempts = 0) => {
+        const hasLightDomControls = !!host.querySelector('#stop-recording, #send-recording, #audio-visualizer');
+        const hasReactMountChildren = reactMount.childElementCount > 0;
+        const hasShadowDomControls = !!(reactMount.shadowRoot && reactMount.shadowRoot.childElementCount > 0);
+        const hasRecorderControls = hasLightDomControls || hasReactMountChildren || hasShadowDomControls;
+        if (hasRecorderControls) {
+            return;
+        }
+        if (attempts < 120) {
+            setTimeout(() => ensureRecorderUiReady(attempts + 1), 50);
+            return;
+        }
+        // Fallback: keep native toolbar controls visible instead of removing
+        // the recording host, because the React component can mount later.
+        if (audioContainer) audioContainer.classList.remove('hidden');
+        if (submitContainer) submitContainer.classList.remove('hidden');
+        console.warn('[AudioRecorder] recorder controls not mounted yet; keeping native controls visible');
+    };
+    ensureRecorderUiReady();
+
+    setupAudioRecorderUIBridge();
+    initAudioRecording();
+
+    // While the recording is active, intercept chat-send so we can stop the
+    // recording the moment the user sends a message. There are two cases:
+    //   - Text message: textarea has content → stop the recorder, keep the
+    //     transcribed/typed text intact and let the normal submit proceed.
+    //   - Audio-only: textarea is empty → finalize streaming/upload and
+    //     submit through `AudioRecorderUI.send()` (legacy behaviour).
+    if (window.__audioRecorderChatSendInterceptor) {
+        document.removeEventListener('click', window.__audioRecorderChatSendInterceptor, true);
+        window.__audioRecorderChatSendInterceptor = null;
+    }
+    const chatSendInterceptor = function (ev) {
+        if (!document.querySelector('.audio-recording-host')) return;
+        const target = ev.target && ev.target.closest && ev.target.closest('.template_send_message_button');
+        if (!target) return;
+        if (target.closest('.audio-recording-host')) return;
+
+        const ta = findChatTextareaForRecording();
+        const hasText = !!(ta && (ta.value || '').trim().length > 0);
+        if (hasText) {
+            stopRecordingKeepingText();
+            return;
+        }
+
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        if (window.AudioRecorderUI && typeof window.AudioRecorderUI.send === 'function') {
+            try { window.AudioRecorderUI.send(); } catch (e) {}
+        }
+    };
+    document.addEventListener('click', chatSendInterceptor, true);
+    window.__audioRecorderChatSendInterceptor = chatSendInterceptor;
+
+    // Catch Enter-key / programmatic form submits as well.
+    if (window.__audioRecorderChatSubmitInterceptor) {
+        document.removeEventListener('submit', window.__audioRecorderChatSubmitInterceptor, true);
+        window.__audioRecorderChatSubmitInterceptor = null;
+    }
+    const chatSubmitInterceptor = function () {
+        if (!document.querySelector('.audio-recording-host')) return;
+        const ta = findChatTextareaForRecording();
+        const hasText = !!(ta && (ta.value || '').trim().length > 0);
+        if (!hasText) return;
+        stopRecordingKeepingText();
+    };
+    document.addEventListener('submit', chatSubmitInterceptor, true);
+    window.__audioRecorderChatSubmitInterceptor = chatSubmitInterceptor;
+
+    // Clear the mic-button loading state once the recording is actually live.
+    const clearMicLoading = (attempts = 0) => {
+        if (audioRecorder && audioRecorder.isRecording) {
+            document.querySelectorAll('.audio-recording-toggler.is-loading').forEach(btn => {
+                btn.classList.remove('is-loading');
+                btn.removeAttribute('aria-busy');
+            });
+            // Force the chat's send button to recompute its enabled/disabled
+            // (gray) state now that recording is active and the submit
+            // container is visible while the textarea may still be empty.
+            if (typeof toggleSendMessageButton === 'function') {
+                try { toggleSendMessageButton('NEW'); } catch (e) {}
+            }
+            startAudioRecordingSendMirror();
+            return;
+        }
+        if (attempts < 120) {
+            setTimeout(() => clearMicLoading(attempts + 1), 50);
+            return;
+        }
+        // Safety: do not leave the spinner stuck forever.
+        document.querySelectorAll('.audio-recording-toggler.is-loading').forEach(btn => {
+            btn.classList.remove('is-loading');
+            btn.removeAttribute('aria-busy');
+        });
+    };
+    clearMicLoading();
+
+    const ensureCanvasSized = (attempts = 0) => {
+        const canvas = document.getElementById('audio-visualizer');
+        if (canvas && canvas.offsetWidth > 0) {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            return;
+        }
+        if (attempts < 20) {
+            setTimeout(() => ensureCanvasSized(attempts + 1), 50);
+        }
+    };
+    ensureCanvasSized();
+}
+
+function hideRecordingInterface() {
+    try {
+        window.dispatchEvent(new CustomEvent('tess:audio-recorder:reset'));
+    } catch (e) {}
+
+    stopAudioRecordingSendMirror();
+
+    document.querySelectorAll('.audio-recording-host').forEach(el => el.remove());
+    document.querySelectorAll('#textarea-container.audio-recording-active').forEach(el => el.classList.remove('audio-recording-active'));
+    document.querySelectorAll('#textarea-container').forEach(el => el.classList.remove('audio-recorder-rounded-bottom'));
+    document.querySelectorAll('.extra-fields-container').forEach(el => el.classList.remove('hidden'));
+    document.querySelectorAll('#audio-recording-container').forEach(el => {
+        el.classList.remove('hidden');
+        el.style.display = '';
+    });
+    document.querySelectorAll('.audio-recording-toggler.is-loading').forEach(btn => {
+        btn.classList.remove('is-loading');
+        btn.removeAttribute('aria-busy');
+    });
+
+    document.querySelectorAll('#audio-recording-container .audio-recording-toggler').forEach((btn) => {
+        btn.removeAttribute('aria-disabled');
+        btn.setAttribute('aria-label', __('Record audio'));
+        btn.setAttribute('title', __('Record audio'));
+    });
+
+    if (window.__audioRecorderChatSendInterceptor) {
+        document.removeEventListener('click', window.__audioRecorderChatSendInterceptor, true);
+        window.__audioRecorderChatSendInterceptor = null;
+    }
+
+    if (window.__audioRecorderChatSubmitInterceptor) {
+        document.removeEventListener('submit', window.__audioRecorderChatSubmitInterceptor, true);
+        window.__audioRecorderChatSubmitInterceptor = null;
+    }
+
+    if (audioRecorder && audioRecorder.isRecording) {
+        audioRecorder.cancelRecording();
+    }
+
+    window.__audioRecorderStreamState = null;
+
+    setTimeout(initAudioRecordingButtons, 100);
+
+    if (typeof toggleSendMessageButton === 'function') {
+        try { toggleSendMessageButton('NEW'); } catch (e) {}
+    }
+}
+
+function initAudioRecording() {
+    if (!audioRecorder) {
+        audioRecorder = new AudioRecorder();
+    } else {
+        if (audioRecorder.isRecording) {
+            audioRecorder.cancelRecording();
+        }
+    }
+    
+    audioRecorder.startRecording();
+
+    // Plan ref: assembly-streaming-transcription (Fase 2).
+    if (typeof maybeStartStreamingSession === 'function') {
+        maybeStartStreamingSession();
+    }
+}
+
+function initAudioRecordingButtons() {
+    const audioButtons = document.querySelectorAll('.audio-recording-toggler');
+    audioButtons.forEach(button => {
+        button.removeEventListener('click', showRecordingInterface);
+        button.addEventListener('click', showRecordingInterface);
+    });
+}
+
+function setupMutationObserver() {
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' || 
+                (mutation.type === 'attributes' && mutation.attributeName === 'style')) {
+                
+                const visibleHistoricChats = document.querySelectorAll('.chat-group-container[data-chat-group]:not([style*="display: none"])');
+                if (visibleHistoricChats.length > 0) {
+                    initAudioRecordingButtons();
+                }
+            }
+        });
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style', 'data-chat-active', 'class']
+    });
+}
+
+function setupAudioRecorderCompatibility() {
+    if (typeof MediaRecorder === 'undefined') {
+        const browserNotSupportedMsg = __('Your browser does not support audio recording. Please use a newer browser like Chrome, Firefox, or Edge.');
+        
+        const audioButtons = document.querySelectorAll('.audio-recording-toggler');
+        audioButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                alert(browserNotSupportedMsg);
+            });
+        });
+        return false;
+    }
+    
+    let mimeType = 'audio/webm';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/mp4';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = '';
+        }
+    }
+    
+    return true;
+}
+
+function bootstrapAudioRecorderOnLoad() {
+    if (window.__TESS_AUDIO_RECORDER_BOOTSTRAP__) {
+        return;
+    }
+    window.__TESS_AUDIO_RECORDER_BOOTSTRAP__ = true;
+    const isCompatible = setupAudioRecorderCompatibility();
+
+    if (isCompatible) {
+        initAudioRecordingButtons();
+
+        setupMutationObserver();
+
+        setTimeout(initAudioRecordingButtons, 1000);
+        setTimeout(initAudioRecordingButtons, 2000);
+
+        document.body.addEventListener('click', function(event) {
+            if (event.target.closest('.audio-recording-toggler')) {
+                const button = event.target.closest('.audio-recording-toggler');
+                showRecordingInterface.call(button, event);
+            }
+        });
+    }
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrapAudioRecorderOnLoad);
+} else {
+    bootstrapAudioRecorderOnLoad();
+}
+
+function showToast(message, type = 'info') {
+    if (typeof toastr !== 'undefined') {
+        toastr[type](message);
+        return;
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `audio-toast fixed top-4 right-4 py-2 px-4 rounded-lg text-white z-50`;
+    
+    switch (type) {
+        case 'success':
+            toast.style.backgroundColor = '#4CAF50';
+            break;
+        case 'error':
+            toast.style.backgroundColor = '#F44336';
+            break;
+        case 'warning':
+            toast.style.backgroundColor = '#FF9800';
+            break;
+        default:
+            toast.style.backgroundColor = '#2196F3';
+    }
+    
+    toast.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
+    toast.style.animation = 'fadeIn 0.3s, fadeOut 0.3s 2.7s';
+    toast.style.opacity = '0.9';
+    
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 0.9; transform: translateY(0); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 0.9; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-20px); }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        if (document.body.contains(toast)) {
+            document.body.removeChild(toast);
+        }
+    }, 3000);
+}
+
+function setupAudioRecorderUIBridge() {
+    window.AudioRecorderUI = {
+        cancel: function() {
+            if (audioRecorder) {
+                audioRecorder.cancelRecording();
+            }
+            if (typeof maybeCancelStreamingSession === 'function') {
+                maybeCancelStreamingSession('user_cancel');
+            }
+            const state = window.__audioRecorderStreamState;
+            if (state && state.textarea) {
+                state.textarea.value = state.originalText || '';
+                try {
+                    state.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                    state.textarea.dispatchEvent(new Event('change', { bubbles: true }));
+                } catch (e) {}
+                if (state.textarea.classList && state.textarea.classList.contains('auto-resize-textarea')) {
+                    state.textarea.style.height = 'auto';
+                    state.textarea.style.height = state.textarea.scrollHeight + 'px';
+                }
+            }
+            hideRecordingInterface();
+            return true;
+        },
+        finishCapture: function() {
+            if (!audioRecorder) return false;
+            if (audioRecorder.isRecording) {
+                audioRecorder.stopRecording();
+            }
+            if (typeof maybeFinalizeStreamingForFinish === 'function'
+                && maybeFinalizeStreamingForFinish()) {
+                return true;
+            }
+            setTimeout(async () => {
+                const blobRecorder = audioRecorder;
+                const audioBlob = blobRecorder ? blobRecorder.getAudioBlob() : null;
+                if (!audioBlob) {
+                    hideRecordingInterface();
+                    return;
+                }
+                try {
+                    const timestamp = new Date().getTime();
+                    const fileExtension = audioBlob.type.includes('webm') ? 'webm' : (audioBlob.type.includes('mp3') ? 'mp3' : 'wav');
+                    const fileName = `audio-message-${timestamp}.${fileExtension}`;
+                    const audioFile = new File([audioBlob], fileName, { type: audioBlob.type });
+                    const formData = new FormData();
+                    formData.append('audio_file', audioFile);
+
+                    const response = await fetch('/dashboard/user/audio/transcribe', {
+                        method: 'POST',
+                        body: formData,
+                        headers: transcriptionRequestHeaders(),
+                        credentials: 'same-origin'
+                    });
+                    if (!response.ok) throw new Error('Erro ao iniciar transcrição');
+                    const data = await response.json();
+                    if (!data.execution_id) throw new Error('execution_id não retornado');
+                    const transcriptionResult = await pollTranscriptionResult(data.execution_id);
+
+                    hideRecordingInterface();
+                    setTimeout(() => {
+                        let transcribedText = transcriptionResult.text;
+                        if (typeof transcribedText === 'string' && transcribedText.startsWith('"') && transcribedText.endsWith('"')) {
+                            try { transcribedText = JSON.parse(transcribedText); } catch (e) {}
+                        }
+                        if (!transcribedText || typeof transcribedText !== 'string') {
+                            showToast(__('Error: Invalid transcription result'), 'error');
+                            return;
+                        }
+                        const success = findAndInsertTextInTextarea(transcribedText);
+                        if (success && typeof toggleSendMessageButton === 'function') {
+                            try { toggleSendMessageButton('NEW'); } catch (e) {}
+                        }
+                        try { reinitializeReactComponents(); } catch (e) {}
+                    }, 200);
+                } catch (err) {
+                    console.warn('[AudioRecorder] legacy finish failed:', err && err.message);
+                    showToast(__('Error processing audio') + ': ' + (err && err.message ? err.message : 'unknown'), 'error');
+                    hideRecordingInterface();
+                }
+            }, 0);
+            return true;
+        },
+        send: function() {
+            if (!audioRecorder) return false;
+            const sendButton = document.getElementById('send-recording');
+            const originalButtonContent = sendButton ? sendButton.innerHTML : '';
+            if (sendButton) {
+                sendButton.innerHTML = `
+                    <svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                `;
+                sendButton.disabled = true;
+            }
+
+            audioRecorder.stopRecording();
+
+            if (typeof maybeFinalizeStreamingForSend === 'function'
+                && maybeFinalizeStreamingForSend(sendButton, originalButtonContent)) {
+                return true;
+            }
+
+            setTimeout(async () => {
+                const audioBlob = audioRecorder.getAudioBlob();
+                if (!audioBlob) {
+                    if (sendButton) {
+                        sendButton.innerHTML = originalButtonContent;
+                        sendButton.disabled = false;
+                    }
+                    return;
+                }
+                try {
+                    const timestamp = new Date().getTime();
+                    const fileExtension = audioBlob.type.includes('webm') ? 'webm' : (audioBlob.type.includes('mp3') ? 'mp3' : 'wav');
+                    const fileName = `audio-message-${timestamp}.${fileExtension}`;
+                    const audioFile = new File([audioBlob], fileName, { type: audioBlob.type });
+                    const formData = new FormData();
+                    formData.append('audio_file', audioFile);
+
+                    const response = await fetch('/dashboard/user/audio/transcribe', {
+                        method: 'POST',
+                        body: formData,
+                        headers: transcriptionRequestHeaders(),
+                        credentials: 'same-origin'
+                    });
+                    if (!response.ok) throw new Error('Erro ao iniciar transcrição');
+                    const data = await response.json();
+                    if (!data.execution_id) throw new Error('execution_id não retornado');
+                    const transcriptionResult = await pollTranscriptionResult(data.execution_id);
+
+                    hideRecordingInterface();
+                    setTimeout(() => {
+                        let transcribedText = transcriptionResult.text;
+                        if (typeof transcribedText === 'string' && transcribedText.startsWith('"') && transcribedText.endsWith('"')) {
+                            try { transcribedText = JSON.parse(transcribedText); } catch (e) {}
+                        }
+                        if (!transcribedText || typeof transcribedText !== 'string') {
+                            showToast(__('Error: Invalid transcription result'), 'error');
+                            return;
+                        }
+                        const success = findAndInsertTextInTextarea(transcribedText);
+                        if (success && typeof toggleSendMessageButton === 'function') {
+                            try { toggleSendMessageButton('NEW'); } catch (e) {}
+                        }
+                        if (success) {
+                            __submitChatAfterStreaming();
+                        }
+                        try { reinitializeReactComponents(); } catch (e) {}
+                    }, 200);
+                } catch (err) {
+                    console.warn('[AudioRecorder] legacy upload failed:', err && err.message);
+                    showToast(__('Error processing audio') + ': ' + (err && err.message ? err.message : 'unknown'), 'error');
+                    hideRecordingInterface();
+                }
+            }, 0);
+            return true;
+        }
+    };
+}
+
+
+/**
+ * The transcription endpoints are workspace-scoped, so every call needs `x-workspace-id` on top
+ * of the CSRF token (see public/assets/js/workspace-request.js).
+ */
+function transcriptionRequestHeaders(extra = {}) {
+    const headers = {
+        ...extra,
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+    };
+
+    return window.tessWithWorkspaceHeaders?.(headers) ?? headers;
+}
+
+function pollTranscriptionResult(executionId) {
+    const maxAttempts = 60;
+    let attempts = 0;
+    
+    return new Promise((resolve, reject) => {
+        const checkStatus = () => {
+            fetch(`/dashboard/user/audio/transcription-status/${executionId}`, {
+                method: 'GET',
+                headers: transcriptionRequestHeaders({ 'Content-Type': 'application/json' }),
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erro de servidor: ${response.status} ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'completed') {
+                    if (data.result && data.result.text) {
+                        resolve(data.result);
+                    } else {
+                        reject(new Error(__('Transcription text not found in response')));
+                    }
+                } else if (data.status === 'failed') {
+                    reject(new Error(data.error || __('Audio transcription failed')));
+                } else if (attempts < maxAttempts) {
+                    attempts++;
+                    setTimeout(checkStatus, 1000);
+                } else {
+                    reject(new Error(__('Audio transcription timeout')));
+                }
+            })
+            .catch(error => {
+                console.error('Error checking transcription status:', error);
+                
+                if (attempts < maxAttempts) {
+                    attempts++;
+                    const backoffDelay = Math.min(1000 * Math.pow(1.5, Math.floor(attempts / 5)), 5000);
+                    setTimeout(checkStatus, backoffDelay);
+                } else {
+                    reject(new Error(__('Failed to check transcription status') + ': ' + error.message));
+                }
+            });
+        };
+        
+        checkStatus();
+    });
+}
+
+function reinitializeReactComponents() {
+    setTimeout(() => {
+        const allReactComponents = document.querySelectorAll('react-component');
+
+        allReactComponents.forEach(el => {
+            try {
+                if (typeof el.render !== 'function' && window.customElements && window.customElements.upgrade) {
+                    window.customElements.upgrade(el);
+                }
+
+                if (typeof el.render === 'function') {
+                    el.render();
+                }
+            } catch (error) {
+                console.warn('Error reinitializing React component:', error);
+            }
+        });
+        
+        document.dispatchEvent(new CustomEvent('reactComponentsReinitialized', {
+            detail: { timestamp: Date.now() }
+        }));
+    }, 250);
+}
+
+function findAndInsertTextInTextarea(transcribedText) {
+
+    const textareaSelectors = [
+        '#chat-textarea-input',
+        '#chat_input_textarea', 
+        '.auto-resize-textarea',
+        '[name="chat_input"]',
+        'textarea[placeholder*="message"]',
+        'textarea[placeholder*="Message"]',
+        'textarea[placeholder*="mensagem"]',
+        'textarea[placeholder*="Mensagem"]'
+    ];
+    
+    let textarea = null;
+    
+    const activeChat = document.querySelector('.chat-group-container[style*="display: block"], .chat-group-container:not([style*="display: none"])');
+    if (activeChat) {
+        for (const selector of textareaSelectors) {
+            textarea = activeChat.querySelector(selector);
+            if (textarea) {
+                break;
+            }
+        }
+    }
+
+    // Se não encontrou no chat ativo, tentar globalmente
+    if (!textarea) {
+        for (const selector of textareaSelectors) {
+            textarea = document.querySelector(selector);
+            if (textarea) {
+                console.log("Found textarea globally with selector:", selector);
+                break;
+            }
+        }
+    }
+
+    if (textarea) {
+        let currentText = '';
+        
+        if (audioRecorder && audioRecorder.savedTextareaContent) {
+            currentText = audioRecorder.savedTextareaContent;
+            audioRecorder.savedTextareaContent = '';
+        } else {
+            currentText = textarea.value || '';
+        }
+
+        const separator = currentText && !currentText.endsWith(' ') ? ' ' : '';
+        textarea.value = currentText + separator + transcribedText;
+
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        textarea.dispatchEvent(new Event('change', { bubbles: true }));
+        textarea.dispatchEvent(new Event('keyup', { bubbles: true }));
+        
+        textarea.focus();
+        const length = textarea.value.length;
+        textarea.setSelectionRange(length, length);
+        
+        if (textarea.classList.contains('auto-resize-textarea')) {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        }
+
+        if (audioRecorder && audioRecorder.savedTextareaContent) {
+            audioRecorder.savedTextareaContent = '';
+        }
+        return true;
+    }
+    
+    return false;
+}
+
+// =============================================================================
+// AssemblyAI streaming integration (Fase 2 + Fase 3 + Fase 4).
+// Plan ref: assembly-streaming-transcription.
+// Lives at the very bottom of the file so we never have to touch the
+// pre-existing recording UI lifecycle (which manipulates innerHTML).
+// =============================================================================
+let __currentStreamingSession = null;
+let __streamingSessionMetrics = null;
+
+// Ensure a streaming session is always torn down when the user navigates
+// away or the tab is hidden — sessions left open at AssemblyAI are billed
+// for their full open duration. Plan ref: assembly-streaming-transcription
+// (Fase 3 – Cost guardrails).
+window.addEventListener('pagehide', function () {
+    if (__currentStreamingSession) {
+        try { __currentStreamingSession.cancel('pagehide'); } catch (e) {}
+        __currentStreamingSession = null;
+    }
+});
+window.addEventListener('beforeunload', function () {
+    if (__currentStreamingSession) {
+        try { __currentStreamingSession.cancel('beforeunload'); } catch (e) {}
+        __currentStreamingSession = null;
+    }
+});
+
+function maybeStartStreamingSession() {
+    if (typeof window.AssemblyStreamingTranscriber === 'undefined') return;
+    if (!window.AssemblyStreamingTranscriber.isEnabled()) return;
+    if (__currentStreamingSession) return;
+
+    const micClickAt = Date.now();
+    const session = new window.AssemblyStreamingTranscriber.StreamingSession({
+        onReady: function () {
+            __streamingSessionMetrics = {
+                micClickAt: micClickAt,
+                streamReadyAt: Date.now(),
+                firstPartialAt: 0
+            };
+        },
+        onPartial: function (text) {
+            __renderStreamingPartialPreview(text);
+        },
+        onFinal: function (text) {
+            __renderStreamingPartialPreview(text);
+        },
+        onIdleTimeout: function () {
+            try { showToast(__('Recording stopped due to silence.'), 'info'); } catch (e) {}
+            if (window.AudioRecorderUI && typeof window.AudioRecorderUI.finishCapture === 'function') {
+                try { window.AudioRecorderUI.finishCapture(); } catch (e) {}
+            }
+        },
+        onMaxDurationReached: function () {
+            try { showToast(__('Maximum recording duration reached.'), 'info'); } catch (e) {}
+            if (window.AudioRecorderUI && typeof window.AudioRecorderUI.finishCapture === 'function') {
+                try { window.AudioRecorderUI.finishCapture(); } catch (e) {}
+            }
+        },
+        onError: function () { /* leave the legacy fallback take over on send */ }
+    });
+
+    __currentStreamingSession = session;
+
+    session.start().catch(function (err) {
+        console.warn('[AssemblyStreaming] failed to start, falling back to legacy:', err && err.message);
+        __currentStreamingSession = null;
+        __streamingSessionMetrics = null;
+    });
+}
+
+function maybeCancelStreamingSession(reason) {
+    if (!__currentStreamingSession) return;
+    const session = __currentStreamingSession;
+    __currentStreamingSession = null;
+    __streamingSessionMetrics = null;
+    try { session.cancel(reason); } catch (e) {}
+}
+
+function maybeFinalizeStreamingForFinish() {
+    if (!__currentStreamingSession) return false;
+
+    const session = __currentStreamingSession;
+    __currentStreamingSession = null;
+
+    session.stop().then(function () {
+        try {
+            const finalText = (session.getResultText() || '').trim();
+            if (finalText) {
+                __writeStreamingTextToChatInput(finalText);
+            }
+            hideRecordingInterface();
+            setTimeout(function () {
+                if (typeof toggleSendMessageButton === 'function') {
+                    try { toggleSendMessageButton('NEW'); } catch (e) {}
+                }
+                try { reinitializeReactComponents(); } catch (e) {}
+            }, 200);
+        } finally {
+            __streamingSessionMetrics = null;
+        }
+    }).catch(function (err) {
+        console.warn('[AssemblyStreaming] finish failed:', err && err.message);
+        try { showToast(__('Error processing audio') + ': ' + (err && err.message ? err.message : 'streaming') + '. ' + __('Try again or record with less background noise.'), 'error'); } catch (e) {}
+        hideRecordingInterface();
+        __streamingSessionMetrics = null;
+    });
+
+    return true;
+}
+
+function maybeFinalizeStreamingForSend(sendButton, originalButtonContent) {
+    if (!__currentStreamingSession) return false;
+
+    const session = __currentStreamingSession;
+    __currentStreamingSession = null;
+
+    session.stop().then(function () {
+        try {
+            // Streaming wrote text directly into the chat textarea. Make sure the
+            // very latest transcript is reflected before submitting.
+            const finalText = (session.getResultText() || '').trim();
+            if (finalText) {
+                __writeStreamingTextToChatInput(finalText);
+            }
+            const state = window.__audioRecorderStreamState;
+            const finalTextareaValue = state && state.textarea ? (state.textarea.value || '').trim() : '';
+
+            hideRecordingInterface();
+            setTimeout(function () {
+                if (finalTextareaValue) {
+                    if (typeof toggleSendMessageButton === 'function') {
+                        try { toggleSendMessageButton('NEW'); } catch (e) {}
+                    }
+                    __submitChatAfterStreaming();
+                } else {
+                    try { showToast(__('No speech detected. Try recording again.'), 'info'); } catch (e) {}
+                }
+                try { reinitializeReactComponents(); } catch (e) {}
+            }, 200);
+        } finally {
+            __streamingSessionMetrics = null;
+            __resetSendButton(sendButton, originalButtonContent);
+        }
+    }).catch(function (err) {
+        console.warn('[AssemblyStreaming] finalize failed:', err && err.message);
+        try { showToast(__('Error processing audio') + ': ' + (err && err.message ? err.message : 'streaming') + '. ' + __('Try again or record with less background noise.'), 'error'); } catch (e) {}
+        hideRecordingInterface();
+        __streamingSessionMetrics = null;
+        __resetSendButton(sendButton, originalButtonContent);
+    });
+
+    return true;
+}
+
+function __submitChatAfterStreaming() {
+    setTimeout(function () {
+        const activeChat = document.querySelector('.chat-group-container[style*="display: block"], .chat-group-container:not([style*="display: none"])');
+        let submitBtn = null;
+        if (activeChat) {
+            submitBtn = activeChat.querySelector('button.template_send_message_button:not(.audio-recording-send-btn):not(:disabled)');
+        }
+        if (!submitBtn) {
+            submitBtn = document.querySelector('button.template_send_message_button:not(.audio-recording-send-btn):not(:disabled)');
+        }
+        if (submitBtn) {
+            try { submitBtn.click(); return; } catch (e) {}
+        }
+        const form = document.getElementById('chat-input-form') || document.getElementById('openai_generator_form');
+        if (form) {
+            try { form.requestSubmit ? form.requestSubmit() : form.submit(); } catch (e) {}
+        }
+    }, 50);
+}
+
+function __resetSendButton(sendButton, originalButtonContent) {
+    if (sendButton && sendButton.isConnected) {
+        try { sendButton.textContent = ''; } catch (e) {}
+        try { sendButton.insertAdjacentHTML('afterbegin', originalButtonContent); } catch (e) {}
+        sendButton.disabled = false;
+    }
+}
+
+function __writeStreamingTextToChatInput(text) {
+    const state = window.__audioRecorderStreamState;
+    if (!state || !state.textarea) return;
+    const ta = state.textarea;
+    const incoming = text || '';
+
+    // If the user has manually edited the textarea since our last write,
+    // re-baseline so future stream updates append to the user's edits
+    // instead of overwriting them.
+    const expectedValue = state.baseline + state.lastSuffix;
+    if (ta.value !== expectedValue && ta.value !== state.lastWrittenValue) {
+        let newBaseline = ta.value || '';
+        if (newBaseline && !newBaseline.endsWith(' ') && incoming) {
+            newBaseline += ' ';
+        }
+        state.baseline = newBaseline;
+        state.lastSuffix = '';
+        if (typeof __currentStreamingSession !== 'undefined' && __currentStreamingSession) {
+            __currentStreamingSession.finalText = '';
+            __currentStreamingSession.lastPartialText = '';
+            __currentStreamingSession.firstPartialAt = 0;
+        }
+    }
+
+    const newValue = state.baseline + incoming;
+    if (ta.value !== newValue) {
+        ta.value = newValue;
+        state.lastSuffix = incoming;
+        state.lastWrittenValue = newValue;
+        try {
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+            ta.dispatchEvent(new Event('change', { bubbles: true }));
+        } catch (e) {}
+        if (ta.classList && ta.classList.contains('auto-resize-textarea')) {
+            ta.style.height = 'auto';
+            ta.style.height = ta.scrollHeight + 'px';
+        }
+        const end = ta.value.length;
+        try { ta.setSelectionRange(end, end); } catch (e) {}
+    }
+}
+
+function __renderStreamingPartialPreview(text) {
+    __writeStreamingTextToChatInput(text);
+}

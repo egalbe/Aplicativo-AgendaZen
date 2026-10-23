@@ -1,0 +1,180 @@
+class AgentCostWarning {
+    constructor() {
+        this.initialized = false;
+        this.modalShown = false;
+        this.warningData = null;
+    }
+
+    init() {
+        if (this.initialized) return;
+        this.initialized = true;
+    }
+
+    async getUserAgentWarningPreference(agentId) {
+        try {
+            const data = {
+                key: "hide_monetization_warning_modal",
+                agentId: agentId
+            };
+
+            const response = await getUserSettingsService().getUserSetting(data);
+            const hideAgentPreference = response.value === 1;
+            return hideAgentPreference;
+        } catch (error) {
+            console.error('Error getting user setting:', error);
+            return false;
+        }
+    }
+
+    setUserAgentWarningPreference(agentId, model = null) {
+        let data = {};
+        if (model) {
+            data = {
+                filters: {
+                    key: "hide_monetization_warning_modal",
+                    agentId: agentId,
+                    model: model
+                },
+                value: true
+            };
+        } else {
+            data = {
+                filters: {
+                    key: "hide_monetization_warning_modal",
+                    agentId: agentId
+                },
+                value: true
+            };
+        }
+        getUserSettingsService().setUserSetting(data);
+    }
+
+    updateAgentCostWarningPropsState(newAgentCostWarningPropsState) {
+        ReactStateManager.partialUpdate("agentCostWarningProps", newAgentCostWarningPropsState);
+    }
+
+    isPaidExecution(
+        hasSteps,
+        formData
+    ) {
+        if (ReactStateManager.get("agentCostWarningProps").totalCredits == 0) {
+            return false;
+        }
+
+        const hasStepsToExecute = hasSteps && !formData.get('root_id');
+        const modelConsumesCredits = ReactStateManager.get("agentCostWarningProps").modelCredits > 0;
+
+        if (hasStepsToExecute || modelConsumesCredits) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    showMonetizationWarningModal(
+        agentId,
+        multiplierValue,
+        formData
+    ) {
+        if (this.modalShown) return false;
+        this.modalShown = true;
+
+        let modalContainer = this.createModalContainer();
+        
+        const agentCostWarningModalProps = {
+            agentId: agentId,
+            multiplierValue: multiplierValue,
+            formData: formData ? Object.fromEntries(formData) : undefined,
+            onConfirm: 'getAgentCostWarningHandler().handleAgentWarningConfirm(event)',
+            onCancel: 'getAgentCostWarningHandler().handleAgentWarningCancel(event)'
+        };
+
+        const reactComponent = document.createElement("react-component");
+        reactComponent.setAttribute("data-component", "AgentMonetizationWarningModal");
+        reactComponent.setAttribute("data-props", JSON.stringify(agentCostWarningModalProps));
+
+        modalContainer.appendChild(reactComponent);
+    }
+
+    createModalContainer() {
+        let modalContainer = document.getElementById('agent-cost-warning-container');
+        if (!modalContainer) {
+            modalContainer = document.createElement('div');
+            modalContainer.id = 'agent-cost-warning-container';
+            document.body.appendChild(modalContainer);
+        } else {
+            modalContainer.innerHTML = '';
+        }
+        return modalContainer;
+    }
+
+    checkWarningAndSubmitForm(formData, agentId, hasSteps) {
+        if (ReactStateManager.get("agentCostWarningProps").monetizationFactor <= 1) {
+            submitGeneratorForm(formData);
+        } else {
+            if (this.isPaidExecution(hasSteps, formData)) {
+                this.getUserAgentWarningPreference(agentId).then(userHideWarningPreference => {
+                    if (userHideWarningPreference) {
+                        submitGeneratorForm(formData);
+                    } else {
+                        this.showMonetizationWarningModal(
+                            agentId,
+                            ReactStateManager.get("agentCostWarningProps").monetizationFactor,
+                            formData
+                        );
+                    }
+                });
+            } else {
+                submitGeneratorForm(formData);
+            }
+        }
+    }
+
+    handleAgentWarningConfirm = function(event) {
+        const warningHandler = getAgentCostWarningHandler();
+        warningHandler.modalShown = false;
+        if (event.detail && event.detail.dismiss) {
+            if (event.detail.isModelCase) {
+                warningHandler.setUserAgentWarningPreference(event.detail.agentId, ReactStateManager.get("agentCostWarningProps").currentModel);
+            } else {
+                warningHandler.setUserAgentWarningPreference(event.detail.agentId);
+            }
+        }
+
+        const container = document.getElementById('agent-cost-warning-container');
+        if (container) container.innerHTML = '';
+
+        if (event.detail.formData) {
+            const formData = new FormData();
+            Object.keys(event.detail.formData).forEach(key => {
+                formData.append(key, event.detail.formData[key]);
+            });
+            submitGeneratorForm(formData);
+        } else {
+            submitGeneratorForm();
+        }
+    }
+
+    handleAgentWarningCancel = function(event) {
+        const warningHandler = getAgentCostWarningHandler();
+        warningHandler.modalShown = false;
+
+        const container = document.getElementById('agent-cost-warning-container');
+        if (container) container.innerHTML = '';
+
+        enableOpenaiGeneratorFormSubmit();
+        
+        if (window.enableSendMessageEditionButton) {
+            awaitingChatResponse = false;
+            enableSendMessageEditionButton();
+            updateButtonState(getChatId());
+            document.querySelector('#textarea-container').style.pointerEvents = "auto";
+        }
+    }
+}
+
+let agentCostWarningHandler = null;
+window.getAgentCostWarningHandler = function () {
+    if (!agentCostWarningHandler) agentCostWarningHandler = new AgentCostWarning();
+    return agentCostWarningHandler;
+}

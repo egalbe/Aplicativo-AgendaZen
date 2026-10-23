@@ -1,0 +1,137 @@
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/vendor-ag-grid-Dd3XAGtj.js","assets/rolldown-runtime-aKtaBQYM.js","assets/vendor-ag-grid-CuWH9ORs.css","assets/vendor-react-DpaRn-Ib.js","assets/ModelInfoCard-DjPQE5II.js","assets/Tag-EK51NMNU.js","assets/utils-CX-ir6oY.js"])))=>i.map(i=>d[i]);
+import{i as e}from"./rolldown-runtime-aKtaBQYM.js";import{t}from"./preload-helper-Dutr66mZ.js";var n=e=>{if(!e)return null;let t=typeof window<`u`&&window.tessModelInfos||null;return t&&Object.prototype.hasOwnProperty.call(t,e)?t[e]:null},r=async n=>{let[r,i,a,o]=await Promise.all([t(()=>import(`./vendor-ag-grid-Dd3XAGtj.js`).then(t=>e(t.a(),1)),__vite__mapDeps([0,1,2])),t(()=>import(`./vendor-react-DpaRn-Ib.js`).then(t=>e(t.n(),1)),__vite__mapDeps([3,1,0,2])),t(()=>import(`./vendor-ag-grid-Dd3XAGtj.js`).then(t=>e(t.i(),1)),__vite__mapDeps([0,1,2])),t(()=>import(`./ModelInfoCard-DjPQE5II.js`).then(e=>e.n),__vite__mapDeps([4,1,0,2,3,5,6]))]),s=r.default||r,c=i.createRoot||i.default&&i.default.createRoot,l=a.flushSync||a.default&&a.default.flushSync,u=o.default||o,d=document.createElement(`div`),f=c(d);return l(()=>{f.render(s.createElement(u,{modelInfo:n}))}),d},i=!1;function a(){let e=e=>(e?.dataset?.bsCustomClass||``).trim(),t=t=>o(t)?!1:e(t).length>0,a=()=>`ontouchstart`in window||navigator.maxTouchPoints>0||window.matchMedia(`(pointer: coarse)`).matches,o=e=>a()&&!!e?.closest(`.model-dropdown-menu, .chat-template-dropdown-menu, .grouped-closed-chip-wrap`),s=i=>{if(!t(i)||bootstrap.Tooltip.getInstance(i))return;let o=e(i),s=i.dataset?.modelInfoId||``,c=new bootstrap.Tooltip(i,{container:`body`,trigger:`manual`,placement:`auto`,...s?{title:()=>n(s)?.name||` `}:{},customClass:[`info-tooltip-v2`,o].filter(Boolean).join(` `),popperConfig:{modifiers:[{name:`applyCustomStyles`,enabled:!0,phase:`write`,fn:({state:e})=>{let{reference:t,popper:n}=e.elements;f(t,n)}}]}}),l=null,p=i.closest(`button.dropdown-item`)||i.closest(`.dropdown-option`)||i,m=a(),h=null,g=null,_=()=>{if(!s)return Promise.resolve();if(g)return g;let e=n(s);return e?(g=r(e).then(e=>{c.setContent({".tooltip-inner":e})}).catch(()=>{}),g):(g=Promise.resolve(),g)},v=()=>{c.show(),setTimeout(()=>{if($(`body`).hasClass(`theme-dark`)){let e=$(`.model-info-card-icon`).attr(`src`);if(e&&!e.includes(`-dark.`)){let[t,n]=e.split(/\.(?=[^.]+$)/),r=`${t}-dark.${n}`;$(`.model-info-card-icon`).attr(`src`,r)}}},100)};p.addEventListener(`mouseenter`,()=>{l&&clearTimeout(l),l=setTimeout(()=>{if(!s){v();return}_().then(v)},500)}),p.addEventListener(`mouseleave`,e=>{l&&(clearTimeout(l),l=null);let t=e.relatedTarget;h&&t&&h.contains(t)||c.hide()}),document.addEventListener(`wheel`,()=>{c.hide()}),m&&i.addEventListener(`click`,e=>{try{e.preventDefault(),e.stopPropagation()}catch{}if(!s){c.toggle();return}_().then(()=>c.toggle())}),i.addEventListener(`inserted.bs.tooltip`,()=>{let e=u(i);e&&(h=e,e.classList.add(`invisible`),document.addEventListener(`mousemove`,function t(){!p.matches(`:hover`)&&!document.querySelector(`#${e.id}:hover`)&&(c.hide(),document.removeEventListener(`mousemove`,t))}))}),i.addEventListener(`shown.bs.tooltip`,async()=>{let e=u(i);e&&(d(e),f(i,e),e.classList.remove(`invisible`),p.addEventListener(`mouseover`,f(i,e)),window.addEventListener(`resize`,f(i,e)),document.addEventListener(`click`,function e(t){p.contains(t.target)||(c.hide(),p.removeEventListener(`mouseover`,f),window.removeEventListener(`resize`,f),document.removeEventListener(`click`,e))}))})},c=()=>{[].slice.call(document.querySelectorAll(`[data-bs-toggle="tooltip"][data-bs-custom-class]`)).map(function(e){s(e)}),l(),m()},l=()=>{i||(i=!0,new MutationObserver(function(e,t){for(let t of e)t.type===`childList`&&t.addedNodes.forEach(function(e){e.nodeType===Node.ELEMENT_NODE&&(e.hasAttribute(`data-bs-toggle`)&&e.getAttribute(`data-bs-toggle`)===`tooltip`?e.hasAttribute(`data-bs-custom-class`)&&s(e):e.querySelectorAll(`[data-bs-toggle="tooltip"][data-bs-custom-class]`).forEach(function(e){s(e)}))})}).observe(document.body,{childList:!0,subtree:!0}))},u=t=>{let n=e(t).split(/\s+/).filter(Boolean)[0];return n?document.querySelector(`.${n}`):null},d=e=>{let t=e.querySelector(`.tooltip-inner`),n=t.querySelector(`.container`);if(!n)return;let r=Array.from(n.children).reduce((e,t)=>{let r=Array.from(t.children).reduce((e,t)=>e+t.offsetWidth,0);return Math.max(e,r,n.offsetWidth)},0),i=2*((parseFloat(getComputedStyle(e).borderWidth)||0)+(parseFloat(getComputedStyle(t).borderWidth)||0)),a=n.offsetWidth-i,o=Math.max(0,t.offsetWidth-a),s=Math.min(r,window.innerWidth-o),c=Math.max(0,Math.ceil(s));n.style.width=`${c}px`},f=(e,t)=>{let n=e.getBoundingClientRect(),r=t.getBoundingClientRect(),i={left:window.scrollX,top:window.scrollY,right:window.scrollX+window.innerWidth,bottom:window.scrollY+window.innerHeight},a={left:i.right-r.width,top:i.bottom-r.height},o={left:()=>({left:i.left+n.left-r.width,top:Math.min(a.top,i.top+n.top+n.height/2-r.height/2)}),top:()=>({left:Math.max(i.left,i.left+n.left+n.width/2-r.width/2),top:i.top+n.top-r.height}),bottom:()=>({left:Math.max(i.left,i.left+n.left+n.width/2-r.width/2),top:i.top+n.bottom}),right:()=>({left:i.left+n.right,top:Math.max(i.top,Math.min(a.top,i.top+n.top+n.height/2-r.height/2))}),edges:()=>({left:i.left,top:r.bottom-n.top>0?i.top:a.top})},s=e=>e.left>=i.left&&e.left<=a.left&&e.top>=i.top&&e.top<=a.top,c=e=>({left:Math.max(i.left,Math.min(e.left,a.left)),top:Math.max(i.top,Math.min(e.top,a.top))}),l;for(let e of[`left`,`top`,`bottom`,`right`,`edges`])if(l=o[e](),s(l))break;l=c(l),t.style.position=`absolute`,t.style.inset=`0px auto auto`,t.style.transform=`translate(${l.left}px, ${l.top}px)`},p=`data-model-info-tooltip-style`,m=()=>{if(document.querySelector(`style[${p}]`))return;let e=document.createElement(`style`);e.setAttribute(p,``),e.textContent=`
+            .info-tooltip-v2-trigger > #tooltip-icon-wrapper:hover {
+                filter: invert(100%);
+            }
+
+            .theme-dark .info-tooltip-v2-trigger > #tooltip-icon-wrapper {
+                filter: invert(100%);
+            }
+
+            .theme-dark .info-tooltip-v2-trigger > #tooltip-icon-wrapper:hover {
+                filter: none;
+            }
+
+            .info-tooltip-v2 {
+                margin: 0;
+                padding: 0;
+                z-index: 10000;
+            }
+
+            .info-tooltip-v2 > .tooltip-arrow {
+                display: none;
+            }
+
+            .info-tooltip-v2 > .tooltip-inner {
+                padding: 0.75rem;
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            /* No width here on purpose: .tooltip-inner's min-width sizes the card. */
+            .info-tooltip-v2 > .tooltip-inner [data-testid="model-info-card"] {
+                background: transparent !important;
+                border: 0 !important;
+                padding: 0 !important;
+                min-width: 0 !important;
+                text-align: left;
+            }
+
+            .info-tooltip-v2 > .tooltip-inner [data-testid="model-info-card"] .justify-between > div {
+                white-space: nowrap;
+            }
+
+            .info-tooltip-v2 .title-text {
+                color: var(--Tooltips-text);
+                font-size: 16px;
+                line-height: 16px;
+                letter-spacing: 0.4px
+            }
+
+            .theme-dark .info-tooltip-v2 .title-text {
+                color: var(--Tooltips-text);
+            }
+
+            .info-tooltip-v2 .small-text {
+                color: var(--text-secondary);
+                font-size: 12px;
+                line-height: 16px;
+                letter-spacing: 0.4px;
+                font-weight: 400;
+            }
+
+            .info-tooltip-v2 .normal-text {
+                color: var(--text-secondary);
+                font-size: 14px;
+                line-height: 16px;
+                letter-spacing: 0.4px;
+                font-weight: 400;
+            }
+
+            .theme-dark .info-tooltip-v2 .normal-text {
+                color: var(--text-secondary);
+            }
+
+            .info-tooltip-v2 .tag {
+                padding: 3px 7px 3px 7px;
+            }
+
+            .info-tooltip-v2 .green-tag {
+                background-color: var(--function-success-tsp) !important;
+                color: var(--function-success);
+            }
+            .info-tooltip-v2 .red-tag {
+                background-color: var(--function-error-tsp) !important;
+                color: var(--function-error);
+            }
+            .info-tooltip-v2 .yellow-tag {
+                background-color: var(--function-warning-tsp) !important;
+                color: var(--function-warning);
+            }
+
+            .info-tooltip-v2 .grey-tag {
+                background-color: var(--fill-tsp-gray-main) !important;
+                color: var(--text-tertiary) !important;
+            }
+
+            .info-tooltip-v2 .highlighted-row {
+                background-color: var(--fill-tsp-gray-main)
+            }
+
+            .theme-dark .info-tooltip-v2 .highlighted-row {
+                background-color: var(--fill-tsp-gray-main)
+            }
+
+            .info-tooltip-v2 .text-null {
+                color: var(--text-disable)
+            }
+
+            .theme-dark .info-tooltip-v2 .text-null {
+                color: var(--text-disable)
+            }
+
+            .info-tooltip-v2 {
+                backdrop-filter: unset  !important;
+                border: solid 8px transparent !important;
+                border-radius: 0.75rem !important;
+                opacity: 1 !important;
+            }
+
+            .info-tooltip-v2 > .tooltip-inner {
+                background-color: var(--Tooltips-main) !important;
+                border: 1px solid var(--Tooltips-border) !important;
+                box-shadow: 0 8px 24px var(--shadow-M) !important;
+                color: var(--Tooltips-text) !important;
+                min-width: 320px !important;
+                display: inline-table;
+            }
+
+            .theme-dark .info-tooltip-v2 > .tooltip-inner {
+                background-color: var(--Tooltips-main) !important;
+                color: var(--Tooltips-text) !important;
+            }
+
+            .info-tooltip-v2 a.small-text {
+                color: var(--text-blue) !important;
+            }
+        `,document.body.appendChild(e)};return{initialize:s,initializeAll:c,getModelInfo:n,renderCard:async e=>{let t=n(e);if(!t)return null;try{return await r(t)}catch{return null}}}}try{typeof window<`u`&&(window.ModelInfoTooltip=window.ModelInfoTooltip||a)}catch{}

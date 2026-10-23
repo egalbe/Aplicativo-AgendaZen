@@ -1,0 +1,1 @@
+import{c as e,n as t}from"./customMcpConnections-CqUoJu-1.js";import{t as n}from"./toolPresentation-CltDyYox.js";window.formatMcpToolDisplayName=n;function r(){let n=e();n&&t(n).catch(()=>{})}typeof document<`u`&&(document.readyState===`loading`?document.addEventListener(`DOMContentLoaded`,r):r());

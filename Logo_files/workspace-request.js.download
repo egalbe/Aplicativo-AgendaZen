@@ -1,0 +1,204 @@
+/**
+ * Workspace context for the legacy (non-Vite) asset tree.
+ *
+ * Panel and `/backend-api/*` endpoints resolve tenancy through ResolveWorkspaceForPlatform:
+ * `?w=` → `x-workspace-id` → body `workspace_id`. Scripts under `public/assets/js/` issue
+ * relative-URL jQuery/XHR calls, which carry none of those, so under the strict workspace
+ * contract they are rejected with 403 (or bounced to the workspace picker on a GET page load).
+ *
+ * This is the plain-script mirror of `resources/js/util/workspaceBootstrap.js` +
+ * `workspaceRequest.js`. It cannot import them — those are ES modules built by Vite, while this
+ * file is served as a classic script — so the resolution order is duplicated here and MUST be
+ * kept in step with them.
+ */
+(function () {
+    'use strict';
+
+    function parseWorkspaceId(value) {
+        var parsed = parseInt(value, 10);
+
+        return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    }
+
+    function readActiveWorkspaceMeta() {
+        if (typeof document === 'undefined' || typeof document.querySelector !== 'function') {
+            return null;
+        }
+
+        var meta = document.querySelector('meta[name="active-workspace-id"]');
+
+        return meta ? meta.getAttribute('content') : null;
+    }
+
+    /**
+     * Same precedence as `resolveActiveWorkspaceId()` in the Vite tree.
+     *
+     * @param {number|string|null} preferredId Overrides the ambient workspace when provided.
+     * @returns {string|null}
+     */
+    function resolveActiveWorkspaceId(preferredId) {
+        var fromPreferred = parseWorkspaceId(preferredId);
+        if (fromPreferred) {
+            return String(fromPreferred);
+        }
+
+        if (typeof window === 'undefined') {
+            return null;
+        }
+
+        var fromQuery = parseWorkspaceId(new URLSearchParams(window.location.search).get('w'));
+        if (fromQuery) {
+            return String(fromQuery);
+        }
+
+        var bridge = window.ReactStateManager;
+        if (bridge && typeof bridge.get === 'function') {
+            var fromBridge = parseWorkspaceId(bridge.get('currentWorkspaceIdAtom'));
+            if (fromBridge) {
+                return String(fromBridge);
+            }
+        }
+
+        var fromMeta = parseWorkspaceId(readActiveWorkspaceMeta());
+        if (fromMeta) {
+            return String(fromMeta);
+        }
+
+        var fromGlobal = parseWorkspaceId(window.user_workspace_id);
+        if (fromGlobal) {
+            return String(fromGlobal);
+        }
+
+        return null;
+    }
+
+    /**
+     * The header must never ride along to a third party, so only same-origin requests get it.
+     * A URL we cannot parse is treated as cross-origin.
+     *
+     * @param {string} url
+     * @returns {boolean}
+     */
+    function isSameOrigin(url) {
+        if (typeof url !== 'string' || url === '') {
+            return false;
+        }
+
+        try {
+            return new URL(url, window.location.href).origin === window.location.origin;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function hasWorkspaceHeader(headers) {
+        if (!headers) {
+            return false;
+        }
+
+        return Object.keys(headers).some(function (name) {
+            return name.toLowerCase() === 'x-workspace-id';
+        });
+    }
+
+    /**
+     * Returns `headers` extended with the active workspace, or unchanged when none resolves —
+     * an unscoped request should 403 rather than send an empty header.
+     *
+     * @param {Object<string, string>} headers
+     * @param {number|string|null} workspaceId
+     * @returns {Object<string, string>}
+     */
+    function withWorkspaceHeaders(headers, workspaceId) {
+        var plain = Object.assign({}, headers || {});
+        var resolved = resolveActiveWorkspaceId(workspaceId);
+
+        if (!resolved || hasWorkspaceHeader(plain)) {
+            return plain;
+        }
+
+        plain['x-workspace-id'] = resolved;
+
+        return plain;
+    }
+
+    /**
+     * Same contract as `withWorkspaceQueryParam()` in the Vite tree: a page navigation carries no
+     * header, so a legacy `location.href = '/dashboard/...'` must take `?w=` along or it lands on
+     * the workspace picker.
+     *
+     * @param {string} url
+     * @param {number|string|null} workspaceId
+     * @returns {string}
+     */
+    function withWorkspaceQuery(url, workspaceId) {
+        if (typeof url !== 'string' || url === '' || /[?&]w=/.test(url)) {
+            return url;
+        }
+
+        var resolved = resolveActiveWorkspaceId(workspaceId);
+        if (!resolved) {
+            return url;
+        }
+
+        var hashIndex = url.indexOf('#');
+        var base = hashIndex === -1 ? url : url.slice(0, hashIndex);
+        var hash = hashIndex === -1 ? '' : url.slice(hashIndex);
+
+        return base + (base.indexOf('?') === -1 ? '?' : '&') + 'w=' + resolved + hash;
+    }
+
+    window.tessWithWorkspaceQuery = withWorkspaceQuery;
+
+    // Flat globals so `fetch()` call sites — which the jQuery prefilter below cannot reach — can
+    // guard with `window.tessWithWorkspaceHeaders?.(headers) ?? headers` on pages that skip this
+    // script (pure-SPA pages, which use the Vite helpers instead).
+    window.tessResolveWorkspaceId = resolveActiveWorkspaceId;
+    window.tessWithWorkspaceHeaders = withWorkspaceHeaders;
+
+    // One prefilter covers every legacy `$.ajax`/`$.get`/`$.post` call site at once, which is the
+    // only tractable way to cover them: hand-editing each would leave the next one written to
+    // fail the same silent 403.
+    function workspacePrefilter(options) {
+        if (options.crossDomain || !isSameOrigin(options.url)) {
+            return;
+        }
+
+        options.headers = withWorkspaceHeaders(options.headers, null);
+    }
+
+    var registeredOn = [];
+
+    function registerPrefilter(jq) {
+        if (!jq || typeof jq.ajaxPrefilter !== 'function' || registeredOn.indexOf(jq) !== -1) {
+            return;
+        }
+
+        jq.ajaxPrefilter(workspacePrefilter);
+        registeredOn.push(jq);
+    }
+
+    registerPrefilter(window.jQuery);
+
+    // A prefilter lives on one jQuery instance. Views that load jQuery again further down the
+    // page (e.g. `<x-add-prompt-variable.scripts>` in the agent editor) replace `window.jQuery`
+    // with a fresh instance that never saw it, and every later `$.ajax` 403s. Every
+    // jQuery build assigns itself through `window.jQuery`, so registering on assignment covers
+    // each copy a page loads, in any order.
+    var current = window.jQuery;
+    var descriptor = Object.getOwnPropertyDescriptor(window, 'jQuery');
+
+    if (!descriptor || descriptor.configurable) {
+        Object.defineProperty(window, 'jQuery', {
+            configurable: true,
+            enumerable: true,
+            get: function () {
+                return current;
+            },
+            set: function (value) {
+                current = value;
+                registerPrefilter(value);
+            },
+        });
+    }
+})();

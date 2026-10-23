@@ -1,0 +1,65 @@
+async function loadFileFields(extraConfig) {
+    if(extraConfig.extraFields == null) return;
+    // TODO: validate how to know if a file is image or not
+    const imageFileInputs = document.querySelectorAll('input[type="file"].model_extra_field');
+
+    for (const imageFileComponent of imageFileInputs) {
+        const fieldName = imageFileComponent.getAttribute('name');
+        if (fieldName === 'image-cover') continue;
+
+        const extraFields = extraConfig.extraFields;
+        const imageField = extraFields[fieldName];
+
+        const files = Array.isArray(imageField) ? imageField : [imageField];
+        const dtFile = new DataTransfer();
+
+        for (const file of files) {
+            try {
+                const fileBaseName = file.split('/').pop();
+                const response = await fetch(file);
+                const blob = await response.blob();
+
+                const imageFile = new File([blob], fileBaseName, {
+                    type: blob.type || 'image/png',
+                });
+
+                dtFile.items.add(imageFile);
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        imageFileComponent.files = dtFile.files;
+    }
+}
+
+async function loadFileByPathname(field) {
+    const imageFileInputs = document.querySelectorAll('input[type="file"].model_extra_field');
+
+    for (const imageFileComponent of imageFileInputs) {
+        const fieldName = imageFileComponent.getAttribute('name');
+        if (fieldName.includes('image-cover')) continue;
+
+        if (field.default) {
+            try {
+                const fileBaseName = field.default.split('/').pop();
+                const response = await fetch(field.default);
+                const blob = await response.blob();
+
+                const imageFile = new File([blob], fileBaseName, {
+                    type: blob.type || 'image/png',
+                });
+
+                const dtFile = new DataTransfer();
+                dtFile.items.add(imageFile);
+                imageFileComponent.files = dtFile.files;
+            } catch (error) {
+                console.error(error);
+                
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(field.files[0]);
+                imageFileComponent.files = dataTransfer.files;
+            }
+        }
+    }
+}

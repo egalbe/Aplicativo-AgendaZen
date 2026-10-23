@@ -1,0 +1,49 @@
+function reapplyListeners(createFollowUnfollowButton, followUrlBase, unfollowUrlBase) {
+    $('.follow, .unfollow').off('click').on('click', function() {
+        const thisButton = $(this);
+        const workspaceIdButton = thisButton.attr('id') ?? 1;
+        const action = thisButton.hasClass('follow') ? 'follow' : 'unfollow';
+        const url = (action === 'follow' ? followUrlBase : unfollowUrlBase).replace('workspaceId', workspaceIdButton);
+        followOrUnfollow(url, thisButton, workspaceIdButton, createFollowUnfollowButton, followUrlBase, unfollowUrlBase);
+    });
+}
+
+function updateFollowersCount(thisButton, isFollowing) {
+    const workspaceId = thisButton.attr('id');
+    const followersCountClass = `.followers-count-${workspaceId}`;
+    const followersCount = $(followersCountClass);
+    const currentCount = parseInt(followersCount.first().text());
+    followersCount.text(isFollowing ? currentCount + 1 : currentCount - 1);
+}
+
+function followOrUnfollow(url, thisButton, workspaceIdButton, createFollowUnfollowButton, followUrlBase, unfollowUrlBase) {
+    $.ajax({
+        url: url,
+        type: 'GET',
+        success: function(response) {
+            let newClasses = response.following ? 'btn btn-secondary unfollow' : 'btn btn-primary follow';
+            let newButtonHTML;
+            
+            const allOpenAiList = `.toggle_follow_unfollow_${workspaceIdButton}`;
+            const allComponentsOpenAiList = $(allOpenAiList);
+            const headerFollowButton = $(`.header_follow_unfollow_${workspaceIdButton}`);
+            
+            if (headerFollowButton.length <= 0) {
+                newButtonHTML = createFollowUnfollowButton(workspaceIdButton, response.following ? 'unfollow' : 'follow', newClasses);
+                allComponentsOpenAiList.replaceWith(newButtonHTML);
+            } else {
+                newClasses = response.following ? 'btn btn-secondary unfollow' : 'btn btn-primary follow';
+                newButtonHTML = createFollowUnfollowButton(workspaceIdButton, response.following ? 'unfollow' : 'follow', newClasses);
+                thisButton.replaceWith(newButtonHTML);
+            }
+
+            updateFollowersCount(thisButton, response.following);
+            reapplyListeners(createFollowUnfollowButton, followUrlBase, unfollowUrlBase);
+            toastr.success(response.message);
+        },
+        error: function(xhr) {
+            const errorMessage = xhr.responseJSON.message;
+            toastr.error(errorMessage);
+        }
+    });
+}

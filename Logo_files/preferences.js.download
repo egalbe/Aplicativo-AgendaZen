@@ -1,0 +1,17 @@
+function languageChanged(selectedElement) {
+    const language = selectedElement.value;
+    $.ajax({
+        url: '/dashboard/user/settings/language',
+        type: 'POST',
+        data: {language: language},
+        success: function (response) {
+            setTimeout(function() {
+                toastr.success("Language changed successfully. Reloading page...");
+                window.location.reload();
+            }, 1000);
+        },
+        error: function (error) {
+            toastr.error(error);
+        }
+    });
+}

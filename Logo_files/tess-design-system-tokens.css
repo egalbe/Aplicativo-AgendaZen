@@ -1,0 +1,370 @@
+/**
+ * TESS Design System — source of truth for visual tokens.
+ *
+ * New platform visual values belong here first. Other CSS files should consume
+ * these variables, expose compatibility aliases, or define component/layout
+ * behavior without becoming a second source of truth.
+ *
+ * Tema claro: :root
+ * Tema escuro: .dark (aplicar classe no elemento raiz, ex. <html class="dark">)
+ */
+
+/* -------------------------------------------------------------------------- */
+/* Paleta base (fonte da verdade — verde marca + acentos marrons)              */
+/* -------------------------------------------------------------------------- */
+
+:root {
+    --color-brand-primary: #0f4c5c;
+    --color-brand-primary-lightest: #397485;
+    --color-brand-primary-light: #205F71;
+    --color-brand-primary-dark: #023644;
+    --color-brand-primary-darkest: #01212A;
+    --color-brand-medium: #1b7a8c;
+    --color-brand-light: #5ebdd0;
+    --color-accent-dark: #79634c;
+    --color-accent-medium: #d4a574;
+    --color-accent-light: #e8c4a0;
+
+    /* Brand RGB para composição com alpha (uso opcional) */
+    --color-brand-primary-rgb: 15, 76, 92;
+    --color-brand-primary-lightest-rgb: 57, 116, 133;
+    --color-brand-primary-light-rgb: 32, 95, 113;
+    --color-brand-primary-dark-rgb: 2, 54, 68;
+    --color-brand-primary-darkest-rgb: 1, 33, 42;
+    --color-brand-medium-rgb: 27, 122, 140;
+    --color-brand-light-rgb: 94, 189, 208;
+
+    /* Aliases sem prefixo color- para compatibilidade */
+    --brand-primary: var(--color-brand-primary);
+    --brand-primary-lightest: var(--color-brand-primary-lightest);
+    --brand-primary-light: var(--color-brand-primary-light);
+    --brand-primary-dark: var(--color-brand-primary-dark);
+    --brand-primary-darkest: var(--color-brand-primary-darkest);
+}
+
+.dark,
+.theme-dark {
+    --color-brand-primary: #5ebdd0;
+    --color-brand-medium: #3d9bab;
+    --color-brand-light: #7ecad8;
+    --color-accent-dark: #c4a882;
+    --color-accent-medium: #e0b88a;
+    --color-accent-light: #f0d4b8;
+
+    --color-brand-primary-rgb: 94, 189, 208;
+    --color-brand-medium-rgb: 61, 155, 171;
+    --color-brand-light-rgb: 126, 202, 216;
+
+    /* Aliases sem prefixo color- para compatibilidade */
+    --brand-primary: var(--color-brand-primary);
+    --brand-primary-lightest: var(--color-brand-primary-lightest);
+    --brand-primary-light: var(--color-brand-primary-light);
+    --brand-primary-dark: var(--color-brand-primary-dark);
+    --brand-primary-darkest: var(--color-brand-primary-darkest);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tokens semânticos — tema claro                                              */
+/* -------------------------------------------------------------------------- */
+
+:root {
+    /* Background Colors */
+    --background-app-banner: linear-gradient(180deg, #f7f7f7, #ececec);
+    --background-canvas-bg: #f0f0ef;
+    --background-card: #fafafa;
+    --background-card-gray: #fafafa;
+    --background-chat-with-image-toolbar: rgba(248, 248, 247, 0.12);
+    --background-code-bg: #f0f0ef;
+    --background-desktop-half-price: linear-gradient(90deg, #e8f4f7, #e3f2f5);
+    --background-drag-overlay: #ffffff80;
+    --background-gray-login: #f8f8f7;
+    --background-gray-main: #f8f8f7;
+    --background-mask-black: #000000a6;
+    --background-mask-white: #f8f8f7a6;
+    --background-menu-gray: #f8f8f7;
+    --background-menu-white: #ffffff;
+    --background-nav: #ebebeb;
+    --background-preview-mask: #000000d9;
+    /* Scrim neutro (ex.: loading em modais — evita cinza azulado tipo slate) */
+    --overlay-modal-scrim: color-mix(in srgb, var(--background-menu-white) 85%, transparent);
+    --background-selection: #b0d8e0;
+    --background-share-header: linear-gradient(0deg, rgba(248, 248, 247, 0), #f8f8f7 45.05%);
+    --background-thinking: linear-gradient(90deg, var(--text-primary) 0%, #d9d8d8 50.48%, var(--text-primary) 99.04%);
+    --background-tool-used: linear-gradient(176deg, rgba(255, 255, 255, 0) 5.88%, rgba(255, 255, 255, 0.6) 51.28%, rgba(255, 255, 255, 0) 94.95%);
+    --background-tool-used-image-loading: #000;
+    --background-tsp-card-gray: #37352f0a;
+    --background-tsp-menu-white: #ffffff14;
+    --background-white-main: #ffffff;
+    --gradient-bg-mask-gray-0: #eaeaeb00;
+
+    /* Border Colors */
+    --Button-secondary-error-border: #f25a5a80;
+    --border-blue: rgba(var(--color-brand-medium-rgb), 0.28);
+    --border-btn-main: #0000001f;
+    --border-dark: #0000001f;
+    --border-input-active: #0000004d;
+    --border-input-search: var(--border-dark);
+    --border-input-search-active: var(--border-input-active);
+    --border-light: #0000000a;
+    --border-main: #0000000f;
+    --border-primary: #4f59661f;
+    --border-white: #ffffff33;
+    --shadows-card-border: #16191d1f;
+    --shadows-card-border-2: #16191d1f;
+
+    /* Button Colors — marca alinhada ao verde */
+    --Button-primary-black: #1a1a19;
+    --Button-primary-brand: var(--color-brand-medium);
+    --Button-primary-brand-disabled: #8ec9d4;
+    --Button-primary-white: #ffffff;
+    --Button-secondary-brand: rgba(var(--color-brand-medium-rgb), 0.1);
+    --Button-secondary-gray: #37352f0f;
+    --Button-secondary-main: #ffffff;
+
+    /* Fill Colors */
+    --fill-black: #28282973;
+    --fill-blue: rgba(var(--color-brand-medium-rgb), 0.08);
+    --fill-gray: #f8f8f7;
+    --fill-input-chat: #ffffff;
+    --fill-input-search: var(--background-menu-white);
+    --fill-tsp-gray-dark: #37352f14;
+    --fill-tsp-gray-main: #37352f0a;
+    --fill-tsp-white-dark: #37352f14;
+    --fill-tsp-white-light: #37352f0a;
+    --fill-tsp-white-main: #37352f0f;
+    --fill-white: #ffffff;
+    --selection-surface: #37352f0a;
+    --selection-surface-strong: #37352f14;
+    --selection-border: #00000024;
+    --selection-text: var(--text-primary);
+    --selection-inner: #00000014;
+    --tab-fill: rgba(0, 0, 0, 0.04);
+
+    /* Functional Colors */
+    --Button-secondary-error-fill: #ffffff;
+    --function-error: #f25a5a;
+    --function-error-tsp: #f25a5a14;
+    --function-success: #25ba3b;
+    --function-success-tsp: #25ba3b14;
+    --function-warning: #efa201;
+    --function-warning-tsp: #efa2011f;
+    --alert-warning-surface: color-mix(in srgb, var(--background-menu-white) 88%, var(--function-warning) 12%);
+    --alert-warning-text: var(--text-primary);
+    --alert-warning-emphasis: color-mix(in srgb, var(--function-warning) 72%, var(--text-primary) 28%);
+    --alert-warning-inner-highlight: color-mix(in srgb, var(--background-menu-white) 80%, transparent);
+    --alert-warning-shadow: color-mix(in srgb, var(--color-brand-primary) 7%, transparent);
+
+    /* Gradient Colors */
+    --gradual-dark-20: #00000033;
+    --gradual-gray-0: #ffffff00;
+    --gradual-gray-100: #ffffff00;
+    --gradual-white-0: #ffffff00;
+    --gradual-white-menu-0: #ffffff00;
+    --gradient-header-colorful: linear-gradient(98.93deg, var(--color-brand-primary), #fff);
+
+    /* Icon Colors */
+    --icon-blue: var(--color-brand-medium);
+    --icon-disable: #b9b9b7;
+    --icon-onblack: #ffffff;
+    --icon-primary: #34322d;
+    --icon-secondary: #5e5e5b;
+    --icon-tertiary: #858481;
+    --icon-white: #ffffff;
+    --icon-white-tsp: #ffffff60;
+
+    /* Logo Colors */
+    --logo-color: var(--color-brand-primary);
+
+    /* Shadow Colors */
+    --shadow-L: #0000003d;
+    --shadow-M: #0000001f;
+    --shadow-S: #00000014;
+    --shadow-XS: #0000000f;
+    --shadows-danger-1: #fed7d7;
+    --shadows-danger-2: #ee3a3a;
+    --shadows-drop-1: #16191d08;
+    --shadows-drop-2: #16191d0a;
+    --shadows-drop-3: #16191d14;
+    --shadows-drop-4: #16191d1f;
+    --shadows-highlight-1: #b8dce5;
+    --shadows-highlight-2: var(--color-brand-medium);
+    --shadows-inner-0: #ffffff00;
+    --shadows-inner-1: #16191d14;
+    --shadows-inner-2: #16191d1f;
+
+    /* Tab Colors */
+    --tab-active-black: #1a1a19;
+
+    /* Text Colors */
+    --background-text-edit-panel: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, var(--background-menu-white) 100%);
+    --text-blue: var(--color-brand-medium);
+    --text-blue-dark: var(--color-brand-primary);
+    --text-disable: #b9b9b7;
+    --text-onblack: #ffffff;
+    --text-primary: #34322d;
+    --text-secondary: #5e5e5b;
+    --text-shining: #e5e5e5;
+    --text-tertiary: #858481;
+    --text-white: #ffffff;
+    --text-white-tsp: #ffffff60;
+    --theme-text-primary: #262626;
+    --theme-text-quaternary: #8c8c8c;
+
+    /* Tooltip Colors — elevated surface + readable text (docs/design-system.md) */
+    --Tooltips-main: var(--background-menu-white);
+    --Tooltips-text: var(--text-primary);
+    --Tooltips-border: var(--border-main);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tokens semânticos — tema escuro                                             */
+/* -------------------------------------------------------------------------- */
+
+.dark,
+.theme-dark {
+    /* Background Colors */
+    --background-app-banner: linear-gradient(180deg, #f7f7f7, #ececec);
+    --background-canvas-bg: #272728;
+    --background-card: #383739;
+    --background-card-gray: #383739;
+    --background-chat-with-image-toolbar: rgba(39, 39, 40, 0.12);
+    --background-code-bg: #2f2f30;
+    --background-desktop-half-price: linear-gradient(90deg, #183359, #1b415a);
+    --background-drag-overlay: #00000080;
+    --background-gray-login: #050505;
+    --background-gray-main: #272728;
+    --background-mask-black: #000000a6;
+    --background-mask-white: #272728a6;
+    --background-menu-gray: #272728;
+    --background-menu-white: #212123;
+    --background-nav: #212122;
+    --background-preview-mask: #000000d9;
+    --overlay-modal-scrim: color-mix(in srgb, var(--background-gray-main) 85%, transparent);
+    --background-selection: #4a6b78;
+    --background-share-header: linear-gradient(0deg, rgba(39, 39, 40, 0), var(--background-gray-main) 45.05%);
+    --background-thinking: linear-gradient(90deg, var(--text-primary) 0%, #d9d8d8 50.48%, var(--text-primary) 99.04%);
+    --background-tool-used: linear-gradient(176deg, rgba(40, 40, 40, 0) 5.88%, rgba(255, 255, 255, 0.08) 51.28%, rgba(40, 40, 40, 0) 94.95%);
+    --background-tool-used-image-loading: #fff;
+    --background-tsp-card-gray: #ffffff0f;
+    --background-tsp-menu-white: #ffffff0f;
+    --background-white-main: #161618;
+    --gradient-bg-mask-gray-0: #1e1e1e00;
+
+    /* Border Colors */
+    --Button-secondary-error-border: #eb4d4d29;
+    --border-blue: rgba(var(--color-brand-light-rgb), 0.28);
+    --border-btn-main: #ffffff1a;
+    --border-dark: #ffffff29;
+    --border-input-active: #ffffff4d;
+    --border-input-search: var(--border-dark);
+    --border-input-search-active: var(--border-input-active);
+    --border-light: #ffffff0f;
+    --border-main: #ffffff14;
+    --border-primary: #56565f52;
+    --border-white: #00000014;
+    --shadows-card-border: #ffffff1f;
+    --shadows-card-border-2: #ffffff00;
+
+    /* Button Colors */
+    --Button-primary-black: #ffffff;
+    --Button-primary-brand: var(--color-brand-light);
+    --Button-primary-brand-disabled: #3d6d7a;
+    --Button-primary-white: #ffffff;
+    --Button-secondary-brand: rgba(var(--color-brand-light-rgb), 0.12);
+    --Button-secondary-gray: #ffffff0f;
+    --Button-secondary-main: #ffffff1f;
+
+    /* Fill Colors */
+    --fill-black: #28282973;
+    --fill-blue: rgba(var(--color-brand-light-rgb), 0.12);
+    --fill-gray: #444345;
+    --fill-input-chat: #363537;
+    --fill-input-search: var(--fill-white);
+    --fill-tsp-gray-dark: #00000047;
+    --fill-tsp-gray-main: #00000033;
+    --fill-tsp-white-dark: #ffffff1f;
+    --fill-tsp-white-light: #ffffff0a;
+    --fill-tsp-white-main: #ffffff0f;
+    --fill-white: #3e3d3e;
+    --selection-surface: #ffffff0f;
+    --selection-surface-strong: #ffffff14;
+    --selection-border: #ffffff29;
+    --selection-text: var(--text-primary);
+    --selection-inner: #00000033;
+    --tab-fill: rgba(255, 255, 255, 0.06);
+
+    /* Functional Colors */
+    --Button-secondary-error-fill: #eb4d4d1f;
+    --function-error: #eb4d4d;
+    --function-error-tsp: #eb4d4d14;
+    --function-success: #5eb92d;
+    --function-success-tsp: #25ba3b1f;
+    --function-warning: #ffbf36;
+    --function-warning-tsp: #ffbf361f;
+    --alert-warning-surface: color-mix(in srgb, var(--background-menu-white) 86%, var(--function-warning) 14%);
+    --alert-warning-text: var(--text-primary);
+    --alert-warning-emphasis: var(--function-warning);
+    --alert-warning-inner-highlight: #ffffff12;
+    --alert-warning-shadow: #0000003d;
+
+    /* Gradient Colors */
+    --gradual-dark-20: #ffffff33;
+    --gradual-gray-0: #44434500;
+    --gradual-gray-100: #444345;
+    --gradual-white-0: #27272800;
+    --gradual-white-menu-0: #38373900;
+    --gradient-header-colorful: linear-gradient(98.93deg, var(--color-brand-primary), #fff);
+
+    /* Icon Colors */
+    --icon-blue: var(--color-brand-light);
+    --icon-disable: #5f5f5f;
+    --icon-onblack: #000000d9;
+    --icon-primary: #dadada;
+    --icon-secondary: #acacac;
+    --icon-tertiary: #7f7f7f;
+    --icon-white: #ffffff;
+    --icon-white-tsp: #ffffff60;
+
+    /* Logo Colors */
+    --logo-color: var(--color-brand-light);
+
+    /* Shadow Colors */
+    --shadow-L: #00000066;
+    --shadow-M: #0000003d;
+    --shadow-S: #00000029;
+    --shadow-XS: #0000001f;
+    --shadows-danger-1: #8f1919;
+    --shadows-danger-2: #ee3a3a;
+    --shadows-drop-1: #0000001f;
+    --shadows-drop-2: #00000033;
+    --shadows-drop-3: #00000047;
+    --shadows-drop-4: #0000005c;
+    --shadows-highlight-1: #2a6b7a;
+    --shadows-highlight-2: var(--color-brand-light);
+    --shadows-inner-0: #ffffff1f;
+    --shadows-inner-1: #ffffff14;
+    --shadows-inner-2: #ffffff1f;
+
+    /* Tab Colors */
+    --tab-active-black: #ffffff;
+
+    /* Text Colors */
+    --background-text-edit-panel: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, var(--background-menu-white) 100%);
+    --text-blue: var(--color-brand-light);
+    --text-blue-dark: #7ecad8;
+    --text-disable: #5f5f5f;
+    --text-onblack: #000000e6;
+    --text-primary: #dadada;
+    --text-secondary: #acacac;
+    --text-shining: #474747;
+    --text-tertiary: #7f7f7f;
+    --text-white: #ffffff;
+    --text-white-tsp: #ffffff60;
+    --theme-text-primary: #dbdbdb;
+    --theme-text-quaternary: #7a7a7a;
+
+    /* Tooltip Colors — elevated surface + readable text (docs/design-system.md) */
+    --Tooltips-main: var(--background-menu-white);
+    --Tooltips-text: var(--text-primary);
+    --Tooltips-border: var(--border-main);
+}

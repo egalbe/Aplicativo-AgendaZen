@@ -1,0 +1,16 @@
+{
+  "models": [
+    {
+      "title": "GPT-4o via Portkey",
+      "provider": "openai",
+      "model": "gpt-4o",
+      "apiBase": "https://api.portkey.ai/v1",
+      "apiKey": "N8N D&I",
+      "requestOptions": {
+        "headers": {
+          "x-portkey-virtual-key": "CcXpfnZxXwcaHSVtGRY1zN+lq39C"
+        }
+      }
+    }
+  ]
+}

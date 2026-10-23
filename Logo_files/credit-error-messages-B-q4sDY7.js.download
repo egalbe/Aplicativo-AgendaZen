@@ -1,0 +1,1 @@
+function e(e=!1){let t=trans(`Insufficient credits. Upgrade your plan or buy extra credits.`);e&&(t=trans(`Agent unavailable at the moment, please try again in a few minutes or contact support.`)),toastr.error(t)}try{typeof window<`u`&&(window.showInsufficientCreditsError=window.showInsufficientCreditsError||e)}catch{}

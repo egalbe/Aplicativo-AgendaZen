@@ -1,0 +1,1 @@
+function e(e){$(`body`).hasClass(`theme-dark`)&&$(e).each(function(){let e=$(this).attr(`src`);if(e&&!e.includes(`-dark.`)){let[t,n]=e.split(/\.(?=[^.]+$)/),r=`${t}-dark.${n}`;$(this).attr(`src`,r)}})}try{typeof window<`u`&&(window.updateImagesForTheme=e)}catch{}

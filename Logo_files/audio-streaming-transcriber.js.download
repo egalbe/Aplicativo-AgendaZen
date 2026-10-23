@@ -1,0 +1,394 @@
+/**
+ * AssemblyAI streaming module for the chat audio recorder.
+ *
+ * Plan ref: assembly-streaming-transcription (Fase 2).
+ *
+ * Owns the realtime path: opens a backend-issued AssemblyAI session, captures
+ * raw PCM 16kHz mono via Web Audio, ships ~50ms chunks over a WebSocket, and
+ * surfaces partial transcripts to the chat composer in real time. Falls back
+ * to the legacy upload+poll flow on any unrecoverable error so the user is
+ * never stuck.
+ */
+(function () {
+    function getConfig() {
+        return (window.AUDIO_RECORDER_CONFIG && window.AUDIO_RECORDER_CONFIG.streaming) || {};
+    }
+
+    function isEnabled() {
+        var cfg = getConfig();
+        if (!cfg.enabled) return false;
+        var hasAudioApi = typeof window.AudioContext !== 'undefined'
+            || typeof window.webkitAudioContext !== 'undefined';
+        var hasWebSocket = typeof window.WebSocket !== 'undefined';
+        var hasMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+        return hasAudioApi && hasWebSocket && hasMedia;
+    }
+
+    function csrfToken() {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
+    }
+
+    function postJson(url, body) {
+        var headers = {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken()
+        };
+        return fetch(url, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: window.tessWithWorkspaceHeaders?.(headers) ?? headers,
+            body: JSON.stringify(body || {})
+        }).then(function (resp) {
+            return resp.json().catch(function () { return {}; }).then(function (data) {
+                if (!resp.ok) {
+                    var err = new Error(data && data.message ? data.message : ('HTTP ' + resp.status));
+                    err.status = resp.status;
+                    err.payload = data;
+                    throw err;
+                }
+                return data;
+            });
+        });
+    }
+
+    function downsampleAndConvertToPCM16(float32Buffer, inputSampleRate, targetSampleRate) {
+        // Cheap downsampler tuned for the 48kHz -> 16kHz path; produces
+        // signed 16-bit PCM little endian, which is what AssemblyAI expects.
+        if (targetSampleRate === inputSampleRate) {
+            var out = new Int16Array(float32Buffer.length);
+            for (var i = 0; i < float32Buffer.length; i++) {
+                var s = Math.max(-1, Math.min(1, float32Buffer[i]));
+                out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            return out;
+        }
+        var ratio = inputSampleRate / targetSampleRate;
+        var newLength = Math.round(float32Buffer.length / ratio);
+        var result = new Int16Array(newLength);
+        var offset = 0;
+        for (var k = 0; k < newLength; k++) {
+            var nextOffset = Math.round((k + 1) * ratio);
+            var sum = 0;
+            var count = 0;
+            for (var j = offset; j < nextOffset && j < float32Buffer.length; j++) {
+                sum += float32Buffer[j];
+                count++;
+            }
+            var sample = count > 0 ? sum / count : 0;
+            var clamped = Math.max(-1, Math.min(1, sample));
+            result[k] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7FFF;
+            offset = nextOffset;
+        }
+        return result;
+    }
+
+    function StreamingSession(handlers) {
+        this.handlers = handlers || {};
+        this.sessionId = null;
+        this.ws = null;
+        this.audioContext = null;
+        this.mediaStream = null;
+        this.processor = null;
+        this.source = null;
+        this.targetSampleRate = 16000;
+        this.startedAt = 0;
+        this.stoppedAt = 0;
+        this.firstPartialAt = 0;
+        this.lastPartialText = '';
+        this.finalText = '';
+        this.idleTimer = null;
+        this.idleTimeoutMs = 10000;
+        this.maxSessionMs = 600000;
+        this.maxSessionTimer = null;
+        this.terminated = false;
+        this.finalized = false;
+        this.lastAudioActivityAt = 0;
+        // turn_order -> { text, isFormatted } so when AssemblyAI emits the
+        // formatted variant of a turn (when `format_turns=true` is enabled),
+        // we replace the unformatted version instead of duplicating it.
+        this.turnsByOrder = {};
+    }
+
+    StreamingSession.prototype.start = function () {
+        var self = this;
+        var cfg = getConfig();
+        this.idleTimeoutMs = Math.max(2, cfg.idleTimeoutSeconds || 10) * 1000;
+        this.maxSessionMs = Math.max(60, cfg.maxSessionDurationSeconds || 600) * 1000;
+
+        return postJson(cfg.sessionEndpoint || '/dashboard/user/audio/streaming/session', {})
+            .then(function (session) {
+                self.sessionId = session.session_id;
+                self.targetSampleRate = session.sample_rate || 16000;
+                return navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+                    self.mediaStream = stream;
+                    var Ctx = window.AudioContext || window.webkitAudioContext;
+                    self.audioContext = new Ctx();
+                    self.source = self.audioContext.createMediaStreamSource(stream);
+                    self.processor = self.audioContext.createScriptProcessor(4096, 1, 1);
+                    self.processor.onaudioprocess = function (event) { self.onAudioFrame(event); };
+                    self.source.connect(self.processor);
+                    self.processor.connect(self.audioContext.destination);
+                    return self.openWebSocket(session.ws_url).then(function () {
+                        self.startedAt = Date.now();
+                        self.lastAudioActivityAt = self.startedAt;
+                        self.scheduleIdleWatch();
+                        self.scheduleMaxSessionGuard();
+                        if (typeof self.handlers.onReady === 'function') {
+                            self.handlers.onReady(session);
+                        }
+                    });
+                });
+            });
+    };
+
+    StreamingSession.prototype.openWebSocket = function (url) {
+        var self = this;
+        return new Promise(function (resolve, reject) {
+            var settled = false;
+            try {
+                self.ws = new WebSocket(url);
+            } catch (err) {
+                reject(err);
+                return;
+            }
+            self.ws.binaryType = 'arraybuffer';
+            self.ws.onopen = function () {
+                if (!settled) { settled = true; resolve(); }
+            };
+            self.ws.onerror = function (event) {
+                if (!settled) {
+                    settled = true;
+                    reject(new Error('WebSocket connection failed.'));
+                } else if (typeof self.handlers.onError === 'function') {
+                    self.handlers.onError(event);
+                }
+            };
+            self.ws.onclose = function () {
+                if (!settled) {
+                    settled = true;
+                    reject(new Error('WebSocket closed before opening.'));
+                }
+            };
+            self.ws.onmessage = function (event) { self.onMessage(event); };
+        });
+    };
+
+    StreamingSession.prototype.onAudioFrame = function (event) {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        var input = event.inputBuffer.getChannelData(0);
+        var sumSq = 0;
+        for (var i = 0; i < input.length; i++) sumSq += input[i] * input[i];
+        var rms = Math.sqrt(sumSq / input.length);
+        if (rms > 0.01) {
+            this.lastAudioActivityAt = Date.now();
+        }
+        var pcm = downsampleAndConvertToPCM16(input, this.audioContext.sampleRate, this.targetSampleRate);
+        try {
+            this.ws.send(pcm.buffer);
+        } catch (err) {
+            if (typeof this.handlers.onError === 'function') {
+                this.handlers.onError(err);
+            }
+        }
+    };
+
+    StreamingSession.prototype.onMessage = function (event) {
+        var data;
+        try { data = JSON.parse(event.data); } catch (e) { return; }
+        var type = data.type || data.message_type;
+        if (type === 'Begin' || type === 'SessionBegins') {
+            return;
+        }
+        if (type === 'Turn') {
+            var transcript = (data.transcript || '').trim();
+            var isFinal = !!data.end_of_turn;
+            var hasFormatField = typeof data.turn_is_formatted !== 'undefined';
+            var isFormatted = data.turn_is_formatted === true;
+            var turnOrder = (typeof data.turn_order === 'number') ? data.turn_order : null;
+            if (transcript) {
+                if (!this.firstPartialAt) this.firstPartialAt = Date.now();
+                if (isFinal) {
+                    if (turnOrder !== null) {
+                        var existing = this.turnsByOrder[turnOrder];
+                        // Prefer the formatted variant — once it arrives,
+                        // never downgrade back to an unformatted version.
+                        var canReplace = !existing
+                            || isFormatted
+                            || !hasFormatField
+                            || !existing.isFormatted;
+                        if (canReplace) {
+                            this.turnsByOrder[turnOrder] = {
+                                text: transcript,
+                                isFormatted: isFormatted
+                            };
+                        }
+                        this.finalText = this.composeFinalFromTurns();
+                    } else {
+                        // Legacy fallback: server did not include turn_order.
+                        this.finalText = (this.finalText ? this.finalText + ' ' : '') + transcript;
+                    }
+                    this.lastPartialText = '';
+                    if (typeof this.handlers.onFinal === 'function') {
+                        this.handlers.onFinal(this.finalText);
+                    }
+                } else {
+                    this.lastPartialText = transcript;
+                    if (typeof this.handlers.onPartial === 'function') {
+                        this.handlers.onPartial(this.composeLiveText());
+                    }
+                }
+            }
+            return;
+        }
+        if (type === 'Termination') {
+            this.terminated = true;
+            this.stopAudioPipeline();
+            if (typeof this.handlers.onTermination === 'function') {
+                this.handlers.onTermination(data);
+            }
+        }
+    };
+
+    StreamingSession.prototype.composeLiveText = function () {
+        if (!this.finalText) return this.lastPartialText;
+        if (!this.lastPartialText) return this.finalText;
+        return this.finalText + ' ' + this.lastPartialText;
+    };
+
+    StreamingSession.prototype.composeFinalFromTurns = function () {
+        var bag = this.turnsByOrder || {};
+        var orders = Object.keys(bag).map(Number).sort(function (a, b) { return a - b; });
+        var pieces = [];
+        for (var i = 0; i < orders.length; i++) {
+            var entry = bag[orders[i]];
+            if (entry && entry.text) pieces.push(entry.text);
+        }
+        return pieces.join(' ');
+    };
+
+    StreamingSession.prototype.scheduleIdleWatch = function () {
+        var self = this;
+        if (this.idleTimer) clearInterval(this.idleTimer);
+        this.idleTimer = setInterval(function () {
+            if (!self.startedAt) return;
+            var idleMs = Date.now() - self.lastAudioActivityAt;
+            if (idleMs >= self.idleTimeoutMs) {
+                if (typeof self.handlers.onIdleTimeout === 'function') {
+                    self.handlers.onIdleTimeout();
+                }
+                self.stop().catch(function () {});
+            }
+        }, 1000);
+    };
+
+    StreamingSession.prototype.scheduleMaxSessionGuard = function () {
+        var self = this;
+        if (this.maxSessionTimer) clearTimeout(this.maxSessionTimer);
+        this.maxSessionTimer = setTimeout(function () {
+            if (typeof self.handlers.onMaxDurationReached === 'function') {
+                self.handlers.onMaxDurationReached();
+            }
+            self.stop().catch(function () {});
+        }, this.maxSessionMs);
+    };
+
+    StreamingSession.prototype.stop = function () {
+        var self = this;
+        if (this.stoppedAt) return Promise.resolve();
+        this.stoppedAt = Date.now();
+        if (this.idleTimer) { clearInterval(this.idleTimer); this.idleTimer = null; }
+        if (this.maxSessionTimer) { clearTimeout(this.maxSessionTimer); this.maxSessionTimer = null; }
+
+        try {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify({ type: 'Terminate' }));
+            }
+        } catch (e) { /* swallow */ }
+
+        return new Promise(function (resolve) {
+            var deadline = Date.now() + 1500;
+            var tick = function () {
+                if (self.terminated) return resolve();
+                if (Date.now() >= deadline) return resolve();
+                setTimeout(tick, 50);
+            };
+            tick();
+        }).then(function () {
+            self.stopAudioPipeline();
+            self.closeWebSocket();
+            return self.finalize();
+        });
+    };
+
+    StreamingSession.prototype.cancel = function (reason) {
+        var self = this;
+        if (this.idleTimer) { clearInterval(this.idleTimer); this.idleTimer = null; }
+        if (this.maxSessionTimer) { clearTimeout(this.maxSessionTimer); this.maxSessionTimer = null; }
+        this.stopAudioPipeline();
+        this.closeWebSocket();
+        if (this.sessionId && !this.finalized) {
+            this.finalized = true;
+            return postJson(getConfig().abortEndpoint || '/dashboard/user/audio/streaming/abort', {
+                session_id: this.sessionId,
+                reason: reason || 'user_cancel'
+            }).catch(function () { return null; });
+        }
+        return Promise.resolve(null);
+    };
+
+    StreamingSession.prototype.finalize = function () {
+        if (!this.sessionId || this.finalized) return Promise.resolve(null);
+        this.finalized = true;
+        var audioDurationSec = this.startedAt
+            ? Math.max(0, ((this.stoppedAt || Date.now()) - this.startedAt) / 1000)
+            : 0;
+        var sessionDurationSec = audioDurationSec;
+        var transcript = (this.finalText || this.lastPartialText || '').trim();
+        var clientMetrics = {
+            ttfp_ms: this.firstPartialAt && this.startedAt
+                ? this.firstPartialAt - this.startedAt
+                : null,
+            stop_to_final_ms: this.stoppedAt && this.firstPartialAt
+                ? Math.max(0, Date.now() - this.stoppedAt)
+                : null
+        };
+        return postJson(getConfig().finalizeEndpoint || '/dashboard/user/audio/streaming/finalize', {
+            session_id: this.sessionId,
+            audio_duration_seconds: audioDurationSec,
+            session_duration_seconds: sessionDurationSec,
+            transcript: transcript,
+            client_metrics: clientMetrics
+        }).catch(function () { return null; });
+    };
+
+    StreamingSession.prototype.stopAudioPipeline = function () {
+        try { if (this.processor) this.processor.disconnect(); } catch (e) {}
+        try { if (this.source) this.source.disconnect(); } catch (e) {}
+        try { if (this.audioContext && this.audioContext.state !== 'closed') this.audioContext.close(); } catch (e) {}
+        if (this.mediaStream) {
+            try { this.mediaStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+        }
+        this.processor = null;
+        this.source = null;
+        this.audioContext = null;
+        this.mediaStream = null;
+    };
+
+    StreamingSession.prototype.closeWebSocket = function () {
+        if (this.ws) {
+            try { this.ws.close(); } catch (e) {}
+            this.ws = null;
+        }
+    };
+
+    StreamingSession.prototype.getResultText = function () {
+        return (this.finalText || this.lastPartialText || '').trim();
+    };
+
+    window.AssemblyStreamingTranscriber = {
+        isEnabled: isEnabled,
+        StreamingSession: StreamingSession
+    };
+})();

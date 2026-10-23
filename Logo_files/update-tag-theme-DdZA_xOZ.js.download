@@ -1,0 +1,1 @@
+function e(){$(`#appMainPage`).hasClass(`theme-dark`)&&$(`.tag`).each(function(){let e=$(this),t=e.data(`dark-background`),n=e.data(`dark-text`);t&&e.css(`background-color`,t),n&&e.css(`color`,n)})}try{typeof window<`u`&&(window.updateTagInDarkTheme=window.updateTagInDarkTheme||e)}catch{}
