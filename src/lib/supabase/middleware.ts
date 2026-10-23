@@ -66,6 +66,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/pacientes") ||
     pathname.startsWith("/prontuario") ||
     pathname.startsWith("/financeiro") ||
+    pathname.startsWith("/divulgacao") ||
     pathname.startsWith("/configuracoes") ||
     pathname.startsWith("/onboarding");
 

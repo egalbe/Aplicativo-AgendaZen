@@ -1,29 +1,39 @@
 import Link from "next/link";
 import { logoutAction } from "@/app/(auth)/actions";
+import { createClient } from "@/lib/supabase/server";
 import {
-  Calendar,
-  Users,
-  FileText,
-  DollarSign,
-  QrCode,
-  Settings,
   LogOut,
   Building2,
+  QrCode,
 } from "lucide-react";
+import { DashboardNav, DesktopSidebarNav } from "@/components/layout/DashboardNav";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const navigation = [
-    { name: "Agenda", href: "/agenda", icon: Calendar },
-    { name: "Pacientes", href: "/pacientes", icon: Users },
-    { name: "Prontuário", href: "/prontuario", icon: FileText },
-    { name: "Financeiro", href: "/financeiro", icon: DollarSign },
-    { name: "QR Code & Divulgação", href: "/divulgacao", icon: QrCode },
-    { name: "Configurações", href: "/configuracoes", icon: Settings },
-  ];
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let clinicName = "Minha Clínica";
+  let clinicSlug = "minha-clinica";
+
+  if (user) {
+    const { data: member } = await supabase
+      .from("clinic_members")
+      .select("clinic_id, clinics(name, slug)")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (member?.clinics) {
+      const c = member.clinics as any;
+      clinicName = c.name || clinicName;
+      clinicSlug = c.slug || clinicSlug;
+    }
+  }
 
   return (
     <div className="min-h-screen flex bg-brand-surface">
@@ -45,22 +55,8 @@ export default function DashboardLayout({
             </div>
           </div>
 
-          {/* Navegação Principal */}
-          <nav className="mt-5 flex-1 px-3 space-y-1">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-slate-700 hover:text-brand-dark hover:bg-slate-50 transition-colors"
-                >
-                  <Icon className="h-4 w-4 text-slate-400 group-hover:text-brand-dark" />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </nav>
+          {/* Navegação Desktop com destaque da rota ativa */}
+          <DesktopSidebarNav />
 
           {/* Footer Sidebar / Sair */}
           <div className="p-3 border-t">
@@ -80,24 +76,29 @@ export default function DashboardLayout({
       {/* Conteúdo Principal */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b bg-white flex items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-brand-dark" />
-            <span className="text-sm font-semibold text-slate-800">
-              Minha Clínica
-            </span>
-            <span className="text-xs bg-emerald-100 text-emerald-800 font-medium px-2 py-0.5 rounded-full">
-              Trial Ativo
-            </span>
+          <div className="flex items-center gap-3">
+            {/* Menu hambúrguer no mobile */}
+            <DashboardNav clinicName={clinicName} clinicSlug={clinicSlug} />
+
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-brand-dark" />
+              <span className="text-sm font-semibold text-slate-800">
+                {clinicName}
+              </span>
+              <span className="text-xs bg-emerald-100 text-emerald-800 font-medium px-2 py-0.5 rounded-full">
+                Trial Ativo
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
             <Link
-              href="/c/minha-clinica"
+              href={`/c/${clinicSlug}`}
               target="_blank"
               className="text-xs text-brand-dark font-medium border border-brand-dark/20 px-3 py-1.5 rounded-lg hover:bg-brand-dark/5 transition-colors flex items-center gap-1.5"
             >
               <QrCode className="h-3.5 w-3.5 text-brand-light" />
-              Página do Paciente
+              <span className="hidden sm:inline">Página do Paciente</span>
             </Link>
           </div>
         </header>
