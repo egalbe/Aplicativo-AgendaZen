@@ -1,22 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { completeOnboardingAction, type OnboardingState } from "./actions";
+import { completeOnboardingAction, type OnboardingState, type DayScheduleItem } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { AlertCircle, Building2, User, Clock, ArrowRight, ArrowLeft, Loader2, Check } from "lucide-react";
+import { AlertCircle, Building2, User, Clock, ArrowRight, ArrowLeft, Loader2, Check, Sun, Moon } from "lucide-react";
 
 const WEEKDAYS = [
-  { id: 1, label: "Segunda" },
-  { id: 2, label: "Terça" },
-  { id: 3, label: "Quarta" },
-  { id: 4, label: "Quinta" },
-  { id: 5, label: "Sexta" },
-  { id: 6, label: "Sábado" },
-  { id: 0, label: "Domingo" },
+  { id: 1, label: "Segunda", short: "Seg" },
+  { id: 2, label: "Terça", short: "Ter" },
+  { id: 3, label: "Quarta", short: "Qua" },
+  { id: 4, label: "Quinta", short: "Qui" },
+  { id: 5, label: "Sexta", short: "Sex" },
+  { id: 6, label: "Sábado", short: "Sáb" },
+  { id: 0, label: "Domingo", short: "Dom" },
+];
+
+const INITIAL_DAYS: DayScheduleItem[] = [
+  { weekday: 1, morningActive: true, morningStart: "08:00", morningEnd: "12:00", afternoonActive: true, afternoonStart: "13:00", afternoonEnd: "18:00" },
+  { weekday: 2, morningActive: true, morningStart: "08:00", morningEnd: "12:00", afternoonActive: true, afternoonStart: "13:00", afternoonEnd: "18:00" },
+  { weekday: 3, morningActive: true, morningStart: "08:00", morningEnd: "12:00", afternoonActive: true, afternoonStart: "13:00", afternoonEnd: "18:00" },
+  { weekday: 4, morningActive: true, morningStart: "08:00", morningEnd: "12:00", afternoonActive: true, afternoonStart: "13:00", afternoonEnd: "18:00" },
+  { weekday: 5, morningActive: true, morningStart: "08:00", morningEnd: "12:00", afternoonActive: true, afternoonStart: "13:00", afternoonEnd: "18:00" },
+  { weekday: 6, morningActive: false, morningStart: "08:00", morningEnd: "12:00", afternoonActive: false, afternoonStart: "13:00", afternoonEnd: "18:00" },
+  { weekday: 0, morningActive: false, morningStart: "08:00", morningEnd: "12:00", afternoonActive: false, afternoonStart: "13:00", afternoonEnd: "18:00" },
 ];
 
 export default function OnboardingPage() {
@@ -42,9 +51,7 @@ export default function OnboardingPage() {
       singlePrice: 150,
     },
     step3: {
-      weekdays: [1, 2, 3, 4, 5],
-      startTime: "08:00",
-      endTime: "18:00",
+      days: INITIAL_DAYS,
       slotMinutes: 50,
     },
   });
@@ -65,22 +72,31 @@ export default function OnboardingPage() {
     }));
   }
 
-  function toggleWeekday(day: number) {
-    setFormData((prev) => {
-      const current = prev.step3.weekdays;
-      const next = current.includes(day)
-        ? current.filter((d) => d !== day)
-        : [...current, day];
-      return {
-        ...prev,
-        step3: { ...prev.step3, weekdays: next },
-      };
-    });
+  function updateDaySchedule(weekday: number, field: keyof DayScheduleItem, value: any) {
+    setFormData((prev) => ({
+      ...prev,
+      step3: {
+        ...prev.step3,
+        days: prev.step3.days.map((item) =>
+          item.weekday === weekday ? { ...item, [field]: value } : item
+        ),
+      },
+    }));
   }
 
   async function handleFinalSubmit() {
     setError(null);
     setLoading(true);
+
+    const hasAnyActive = formData.step3.days.some(
+      (d) => d.morningActive || d.afternoonActive
+    );
+
+    if (!hasAnyActive) {
+      setError("Ative pelo menos um turno (manhã ou tarde) em algum dia da semana.");
+      setLoading(false);
+      return;
+    }
 
     const result = await completeOnboardingAction(formData);
 
@@ -126,14 +142,14 @@ export default function OnboardingPage() {
           )}
           {step === 3 && (
             <>
-              <Clock className="h-5 w-5 text-brand-light" /> Grade de Horários de Atendimento
+              <Clock className="h-5 w-5 text-brand-light" /> Grade de Horários por Turno (Manhã & Tarde)
             </>
           )}
         </CardTitle>
         <CardDescription>
           {step === 1 && "Defina a identidade da sua clínica e o link público de agendamento."}
           {step === 2 && "Cadastre seu registro profissional (CREFITO) e seu serviço principal."}
-          {step === 3 && "Configure os dias e horários padrão em que você atende."}
+          {step === 3 && "Configure individualmente os turnos da manhã e da tarde para cada dia da semana."}
         </CardDescription>
       </CardHeader>
 
@@ -367,67 +383,192 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* PASSO 3: HORÁRIOS DE ATENDIMENTO */}
+        {/* PASSO 3: HORÁRIOS POR TURNO (MANHÃ E TARDE) */}
         {step === 3 && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Dias da Semana com Atendimento</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {WEEKDAYS.map((day) => {
-                  const selected = formData.step3.weekdays.includes(day.id);
-                  return (
-                    <button
-                      type="button"
-                      key={day.id}
-                      onClick={() => toggleWeekday(day.id)}
-                      className={`flex items-center justify-between p-2.5 rounded-lg border text-xs font-semibold transition-all ${
-                        selected
-                          ? "bg-brand-dark text-white border-brand-dark"
-                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                      }`}
-                    >
-                      {day.label}
-                      {selected && <Check className="h-3.5 w-3.5 text-brand-light" />}
-                    </button>
-                  );
-                })}
-              </div>
+          <div className="space-y-5">
+            <div className="flex items-center justify-between rounded-lg bg-emerald-50/80 p-3 text-xs text-emerald-900 border border-emerald-200">
+              <p>
+                <strong>Dica:</strong> Ative ou desative <strong>Manhã</strong> e <strong>Tarde</strong> de forma independente para cada dia (ex: atenda só de manhã na terça e só de tarde na quinta).
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="startTime">Horário de Início</Label>
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={formData.step3.startTime}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      step3: { ...prev.step3, startTime: e.target.value },
-                    }))
-                  }
-                />
-              </div>
+            {/* Lista dos 7 dias com Manhã e Tarde */}
+            <div className="space-y-2.5">
+              {WEEKDAYS.map((w) => {
+                const dayConfig = formData.step3.days.find((d) => d.weekday === w.id);
+                if (!dayConfig) return null;
 
-              <div className="space-y-1.5">
-                <Label htmlFor="endTime">Horário de Término</Label>
-                <Input
-                  id="endTime"
-                  type="time"
-                  value={formData.step3.endTime}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      step3: { ...prev.step3, endTime: e.target.value },
-                    }))
-                  }
-                />
-              </div>
+                const hasAnyTurn = dayConfig.morningActive || dayConfig.afternoonActive;
+
+                return (
+                  <div
+                    key={w.id}
+                    className={`rounded-xl border p-3 transition-all ${
+                      hasAnyTurn
+                        ? "bg-white border-slate-300 shadow-sm"
+                        : "bg-slate-50/70 border-slate-200 opacity-60"
+                    }`}
+                  >
+                    {/* Cabeçalho do dia */}
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                          hasAnyTurn ? "bg-brand-dark text-white" : "bg-slate-200 text-slate-600"
+                        }`}>
+                          {w.short}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-800">
+                          {w.label}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newActive = !hasAnyTurn;
+                            updateDaySchedule(w.id, "morningActive", newActive);
+                            updateDaySchedule(w.id, "afternoonActive", newActive);
+                          }}
+                          className="text-xs font-medium text-slate-500 hover:text-brand-dark underline"
+                        >
+                          {hasAnyTurn ? "Desativar dia" : "Ativar dia completo"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Turnos: Manhã e Tarde */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3">
+                      {/* TURNO MANHÃ */}
+                      <div
+                        className={`rounded-lg border p-2.5 transition-all ${
+                          dayConfig.morningActive
+                            ? "bg-amber-50/50 border-amber-200"
+                            : "bg-slate-50/40 border-slate-200"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={dayConfig.morningActive}
+                              onChange={(e) =>
+                                updateDaySchedule(w.id, "morningActive", e.target.checked)
+                              }
+                              className="h-4 w-4 rounded border-slate-300 text-brand-dark focus:ring-brand-light"
+                            />
+                            <Sun className="h-3.5 w-3.5 text-amber-500" />
+                            Turno Manhã
+                          </label>
+
+                          {dayConfig.morningActive && (
+                            <span className="text-[10px] font-semibold text-amber-800 bg-amber-100/70 px-1.5 py-0.5 rounded">
+                              Ativo
+                            </span>
+                          )}
+                        </div>
+
+                        {dayConfig.morningActive ? (
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-[10px] text-slate-500 block mb-0.5">Início</span>
+                              <input
+                                type="time"
+                                value={dayConfig.morningStart}
+                                onChange={(e) =>
+                                  updateDaySchedule(w.id, "morningStart", e.target.value)
+                                }
+                                className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-500 block mb-0.5">Término</span>
+                              <input
+                                type="time"
+                                value={dayConfig.morningEnd}
+                                onChange={(e) =>
+                                  updateDaySchedule(w.id, "morningEnd", e.target.value)
+                                }
+                                className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic block py-1">
+                            Não atende pela manhã
+                          </span>
+                        )}
+                      </div>
+
+                      {/* TURNO TARDE */}
+                      <div
+                        className={`rounded-lg border p-2.5 transition-all ${
+                          dayConfig.afternoonActive
+                            ? "bg-indigo-50/50 border-indigo-200"
+                            : "bg-slate-50/40 border-slate-200"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-700">
+                            <input
+                              type="checkbox"
+                              checked={dayConfig.afternoonActive}
+                              onChange={(e) =>
+                                updateDaySchedule(w.id, "afternoonActive", e.target.checked)
+                              }
+                              className="h-4 w-4 rounded border-slate-300 text-brand-dark focus:ring-brand-light"
+                            />
+                            <Moon className="h-3.5 w-3.5 text-indigo-500" />
+                            Turno Tarde
+                          </label>
+
+                          {dayConfig.afternoonActive && (
+                            <span className="text-[10px] font-semibold text-indigo-800 bg-indigo-100/70 px-1.5 py-0.5 rounded">
+                              Ativo
+                            </span>
+                          )}
+                        </div>
+
+                        {dayConfig.afternoonActive ? (
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-[10px] text-slate-500 block mb-0.5">Início</span>
+                              <input
+                                type="time"
+                                value={dayConfig.afternoonStart}
+                                onChange={(e) =>
+                                  updateDaySchedule(w.id, "afternoonStart", e.target.value)
+                                }
+                                className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium"
+                              />
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-slate-500 block mb-0.5">Término</span>
+                              <input
+                                type="time"
+                                value={dayConfig.afternoonEnd}
+                                onChange={(e) =>
+                                  updateDaySchedule(w.id, "afternoonEnd", e.target.value)
+                                }
+                                className="w-full rounded border border-slate-200 bg-white px-2 py-1 text-xs font-medium"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-400 italic block py-1">
+                            Não atende pela tarde
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="slotMinutes">Duração Padrão do Slot de Atendimento</Label>
+            {/* Duração Padrão do Slot */}
+            <div className="space-y-1.5 pt-2 border-t">
+              <Label htmlFor="slotMinutes">Duração Padrão de Cada Atendimento</Label>
               <select
                 id="slotMinutes"
                 value={formData.step3.slotMinutes}
@@ -437,11 +578,11 @@ export default function OnboardingPage() {
                     step3: { ...prev.step3, slotMinutes: +e.target.value },
                   }))
                 }
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                className="flex h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm"
               >
                 <option value={30}>30 minutos</option>
                 <option value={45}>45 minutos</option>
-                <option value={50}>50 minutos (Recomendado)</option>
+                <option value={50}>50 minutos (Recomendado Fisioterapia & Acupuntura)</option>
                 <option value={60}>60 minutos (1 hora)</option>
               </select>
             </div>

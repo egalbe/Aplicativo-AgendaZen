@@ -8,6 +8,16 @@ import {
   onboardingStep3Schema,
 } from "@/lib/validations/auth";
 
+export interface DayScheduleItem {
+  weekday: number;
+  morningActive: boolean;
+  morningStart: string;
+  morningEnd: string;
+  afternoonActive: boolean;
+  afternoonStart: string;
+  afternoonEnd: string;
+}
+
 export interface OnboardingState {
   step1: {
     clinicName: string;
@@ -25,9 +35,7 @@ export interface OnboardingState {
     singlePrice: number;
   };
   step3: {
-    weekdays: number[];
-    startTime: string;
-    endTime: string;
+    days: DayScheduleItem[];
     slotMinutes: number;
   };
 }
@@ -147,17 +155,40 @@ export async function completeOnboardingAction(data: OnboardingState) {
   }
 
   // 6. Criar as regras de horário de atendimento na agenda (schedule_rules)
-  const rules = v3.data.weekdays.map((weekday) => ({
-    clinic_id: clinicId,
-    professional_id: prof.id,
-    weekday,
-    start_time: v3.data.startTime,
-    end_time: v3.data.endTime,
-    slot_minutes: v3.data.slotMinutes,
-    default_status: "free",
-  }));
+  // Suporte a Manhã e Tarde independentes por dia da semana
+  const rulesToInsert: any[] = [];
 
-  await supabase.from("schedule_rules").insert(rules);
+  for (const day of v3.data.days) {
+    if (day.morningActive) {
+      rulesToInsert.push({
+        clinic_id: clinicId,
+        professional_id: prof.id,
+        weekday: day.weekday,
+        start_time: day.morningStart,
+        end_time: day.morningEnd,
+        slot_minutes: v3.data.slotMinutes,
+        default_status: "free",
+        room_name: "Turno Manhã",
+      });
+    }
+
+    if (day.afternoonActive) {
+      rulesToInsert.push({
+        clinic_id: clinicId,
+        professional_id: prof.id,
+        weekday: day.weekday,
+        start_time: day.afternoonStart,
+        end_time: day.afternoonEnd,
+        slot_minutes: v3.data.slotMinutes,
+        default_status: "free",
+        room_name: "Turno Tarde",
+      });
+    }
+  }
+
+  if (rulesToInsert.length > 0) {
+    await supabase.from("schedule_rules").insert(rulesToInsert);
+  }
 
   redirect("/agenda");
 }

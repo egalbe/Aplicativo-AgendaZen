@@ -37,11 +37,19 @@ export const onboardingStep2Schema = z.object({
   singlePrice: z.coerce.number().min(0, "O preço deve ser positivo"),
 });
 
+export const dayScheduleSchema = z.object({
+  weekday: z.number().min(0).max(6),
+  morningActive: z.boolean().default(true),
+  morningStart: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM").default("08:00"),
+  morningEnd: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM").default("12:00"),
+  afternoonActive: z.boolean().default(true),
+  afternoonStart: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM").default("13:00"),
+  afternoonEnd: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM").default("18:00"),
+});
+
 export const onboardingStep3Schema = z.object({
-  weekdays: z.array(z.number()).min(1, "Selecione ao menos um dia de atendimento"),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM"),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM"),
-  slotMinutes: z.coerce.number().min(15).max(120),
+  days: z.array(dayScheduleSchema).min(1, "Configure ao menos um dia com atendimento"),
+  slotMinutes: z.coerce.number().min(15).max(120).default(50),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

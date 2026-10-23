@@ -32,9 +32,6 @@ export async function getAvailableSlotsForDate(
     return []; // Profissional não atende neste dia
   }
 
-  const rule = rules[0];
-  const slotMinutes = rule.slot_minutes || durationMin || 50;
-
   // 3. Buscar agendamentos já existentes neste dia para este profissional
   const dayStartIso = `${dateStr}T00:00:00Z`;
   const dayEndIso = `${dateStr}T23:59:59Z`;
@@ -60,116 +57,123 @@ export async function getAvailableSlotsForDate(
     .eq("clinic_id", clinicId)
     .eq("professional_id", professionalId);
 
-  // 6. Gerar os slots entre start_time e end_time
+  // 6. Gerar os slots para cada janela de atendimento do dia (ex: Manhã e Tarde)
   const slots: AvailableSlot[] = [];
-  const [startHour, startMin] = rule.start_time.split(":").map(Number);
-  const [endHour, endMin] = rule.end_time.split(":").map(Number);
-
-  let currentSlotDate = new Date(targetDate);
-  currentSlotDate.setHours(startHour, startMin, 0, 0);
-
-  const workEndDate = new Date(targetDate);
-  workEndDate.setHours(endHour, endMin, 0, 0);
-
-  // Não permitir agendar no passado
   const now = new Date();
 
-  while (isBefore(currentSlotDate, workEndDate)) {
-    const nextSlotDate = addMinutes(currentSlotDate, slotMinutes);
-    if (isAfter(nextSlotDate, workEndDate)) {
-      break;
-    }
+  // Ordenar as regras por horário de início
+  const sortedRules = [...rules].sort((a, b) => a.start_time.localeCompare(b.start_time));
 
-    const timeString = format(currentSlotDate, "HH:mm");
-    let slotStatus: "free" | "reserved" | "blocked" = rule.default_status || "free";
-    let isOccupied = false;
+  for (const rule of sortedRules) {
+    const slotMinutes = rule.slot_minutes || durationMin || 50;
+    const [startHour, startMin] = rule.start_time.split(":").map(Number);
+    const [endHour, endMin] = rule.end_time.split(":").map(Number);
 
-    // A. Checar intervalos/pausas (ex: almoço)
-    if (rule.schedule_breaks && rule.schedule_breaks.length > 0) {
-      for (const brk of rule.schedule_breaks) {
-        const [bStartH, bStartM] = brk.start_time.split(":").map(Number);
-        const [bEndH, bEndM] = brk.end_time.split(":").map(Number);
-        const breakStart = new Date(targetDate);
-        breakStart.setHours(bStartH, bStartM, 0, 0);
-        const breakEnd = new Date(targetDate);
-        breakEnd.setHours(bEndH, bEndM, 0, 0);
+    let currentSlotDate = new Date(targetDate);
+    currentSlotDate.setHours(startHour, startMin, 0, 0);
 
-        if (
-          (isAfter(currentSlotDate, breakStart) || currentSlotDate.getTime() === breakStart.getTime()) &&
-          isBefore(currentSlotDate, breakEnd)
-        ) {
-          isOccupied = true;
-          slotStatus = "blocked";
-          break;
-        }
+    const workEndDate = new Date(targetDate);
+    workEndDate.setHours(endHour, endMin, 0, 0);
+
+    while (isBefore(currentSlotDate, workEndDate)) {
+      const nextSlotDate = addMinutes(currentSlotDate, slotMinutes);
+      if (isAfter(nextSlotDate, workEndDate)) {
+        break;
       }
-    }
 
-    // B. Checar conflito com agendamentos existentes
-    if (!isOccupied && appointments) {
-      for (const appt of appointments) {
-        if (!appt.period) continue;
-        // O formato PostgreSQL tstzrange é ex: [2026-10-23 10:00:00+00, 2026-10-23 10:50:00+00)
-        // Fazemos verificação simples por string ou timestamp
-        const rawPeriod = String(appt.period);
-        const match = rawPeriod.match(/["']?([^,"'\[\()]+)["']?,\s*["']?([^,"'\]\)]+)["']?/);
-        if (match) {
-          const apptStart = new Date(match[1]);
-          const apptEnd = new Date(match[2]);
+      const timeString = format(currentSlotDate, "HH:mm");
+
+      // Evitar duplicatas caso janelas se sobreponham
+      if (slots.some((s) => s.time === timeString)) {
+        currentSlotDate = nextSlotDate;
+        continue;
+      }
+
+      let slotStatus: "free" | "reserved" | "blocked" = rule.default_status || "free";
+      let isOccupied = false;
+
+      // A. Checar intervalos/pausas (ex: almoço)
+      if (rule.schedule_breaks && rule.schedule_breaks.length > 0) {
+        for (const brk of rule.schedule_breaks) {
+          const [bStartH, bStartM] = brk.start_time.split(":").map(Number);
+          const [bEndH, bEndM] = brk.end_time.split(":").map(Number);
+          const breakStart = new Date(targetDate);
+          breakStart.setHours(bStartH, bStartM, 0, 0);
+          const breakEnd = new Date(targetDate);
+          breakEnd.setHours(bEndH, bEndM, 0, 0);
 
           if (
-            (currentSlotDate >= apptStart && currentSlotDate < apptEnd) ||
-            (nextSlotDate > apptStart && nextSlotDate <= apptEnd) ||
-            (currentSlotDate <= apptStart && nextSlotDate >= apptEnd)
+            (isAfter(currentSlotDate, breakStart) || currentSlotDate.getTime() === breakStart.getTime()) &&
+            isBefore(currentSlotDate, breakEnd)
           ) {
             isOccupied = true;
-            slotStatus = "reserved";
+            slotStatus = "blocked";
             break;
           }
         }
       }
-    }
 
-    // C. Checar se já passou do horário atual (se for hoje)
-    if (isBefore(currentSlotDate, now)) {
-      isOccupied = true;
-      slotStatus = "blocked";
-    }
+      // B. Checar conflito com agendamentos existentes
+      if (!isOccupied && appointments) {
+        for (const appt of appointments) {
+          if (!appt.period) continue;
+          const rawPeriod = String(appt.period);
+          const match = rawPeriod.match(/["']?([^,"'\[\()]+)["']?,\s*["']?([^,"'\]\)]+)["']?/);
+          if (match) {
+            const apptStart = new Date(match[1]);
+            const apptEnd = new Date(match[2]);
 
-    // D. Checar overrides manuais para este horário exato
-    if (overrides) {
-      for (const ov of overrides) {
-        const ovDate = new Date(ov.starts_at);
-        if (
-          ovDate.getFullYear() === currentSlotDate.getFullYear() &&
-          ovDate.getMonth() === currentSlotDate.getMonth() &&
-          ovDate.getDate() === currentSlotDate.getDate() &&
-          ovDate.getHours() === currentSlotDate.getHours() &&
-          ovDate.getMinutes() === currentSlotDate.getMinutes()
-        ) {
-          slotStatus = ov.status;
-          if (slotStatus === "free") {
-            isOccupied = false;
-          } else {
-            isOccupied = true;
+            if (
+              (currentSlotDate >= apptStart && currentSlotDate < apptEnd) ||
+              (nextSlotDate > apptStart && nextSlotDate <= apptEnd) ||
+              (currentSlotDate <= apptStart && nextSlotDate >= apptEnd)
+            ) {
+              isOccupied = true;
+              slotStatus = "reserved";
+              break;
+            }
           }
-          break;
         }
       }
+
+      // C. Checar se já passou do horário atual (se for hoje)
+      if (isBefore(currentSlotDate, now)) {
+        isOccupied = true;
+        slotStatus = "blocked";
+      }
+
+      // D. Checar overrides manuais para este horário exato
+      if (overrides) {
+        for (const ov of overrides) {
+          const ovDate = new Date(ov.starts_at);
+          if (
+            ovDate.getFullYear() === currentSlotDate.getFullYear() &&
+            ovDate.getMonth() === currentSlotDate.getMonth() &&
+            ovDate.getDate() === currentSlotDate.getDate() &&
+            ovDate.getHours() === currentSlotDate.getHours() &&
+            ovDate.getMinutes() === currentSlotDate.getMinutes()
+          ) {
+            slotStatus = ov.status;
+            if (slotStatus === "free") {
+              isOccupied = false;
+            } else {
+              isOccupied = true;
+            }
+            break;
+          }
+        }
+      }
+
+      const isAvailableForPublic = !isOccupied && slotStatus === "free";
+
+      slots.push({
+        time: timeString,
+        status: slotStatus,
+        available: isAvailableForPublic,
+      });
+
+      currentSlotDate = nextSlotDate;
     }
-
-    // Somente horários que possuem o status 'free' na regra da clínica
-    // podem ser agendados pelo paciente publicamente via QR Code
-    // Horários com status 'reserved' são guardados pela clínica para encaixes internos
-    const isAvailableForPublic = !isOccupied && slotStatus === "free";
-
-    slots.push({
-      time: timeString,
-      status: slotStatus,
-      available: isAvailableForPublic,
-    });
-
-    currentSlotDate = nextSlotDate;
   }
 
   return slots;
